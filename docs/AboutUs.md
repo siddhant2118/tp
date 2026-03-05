@@ -2,5 +2,6 @@
 
 Display | Name | Github Profile | Portfolio 
 --------|:----:|:--------------:|:---------:
-![](https://via.placeholder.com/100.png?text=Photo) | Ziling Wang | [Github](https://github.com/Michael-wzl) | [Portfolio](docs/team/Michael-wzl.md)
+![zlwang](docs/imgs/protego_profileimg.png) | Ziling Wang | [Github](https://github.com/Michael-wzl) | [Portfolio](https://github.com/Michael-wzl)
+![](https://via.placeholder.com/100.png?text=Photo) | Hao Jun | [Github](https://github.com/tablehao) | [Portfolio](https://github.com/tablhao)
 ![](https://via.placeholder.com/100.png?text=Photo) | Siddhant | [Github](https://github.com/siddhant2118) | [Portfolio](docs/team/siddhant2118.md)
