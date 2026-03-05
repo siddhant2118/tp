@@ -2,4 +2,4 @@
 
 Display | Name | Github Profile | Portfolio 
 --------|:----:|:--------------:|:---------:
-![](https://via.placeholder.com/100.png?text=Photo) | Ziling Wang | [Github](https://github.com/Michael-wzl) | [Portfolio](docs/team/Michael-wzl.md)
+![zlwang](docs/imgs/protego_profileimg.png) | Ziling Wang | [Github](https://github.com/Michael-wzl) | [Portfolio](https://github.com/Michael-wzl)
