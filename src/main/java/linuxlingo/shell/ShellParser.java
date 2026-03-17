@@ -239,9 +239,9 @@ public class ShellParser {
      */
     private Segment buildSegment(List<String> words, RedirectInfo redirect) {
         String commandName = words.get(0);
-        String[] args = new String[words.size() - 1];
+        String[] args = new String[words.size()-1];
         for(int i = 1; i < words.size(); i++) {
-            args[i - 1] = words.get(i);
+            args[i-1] = words.get(i);
         }
         return new Segment(commandName, args, redirect);
     }
