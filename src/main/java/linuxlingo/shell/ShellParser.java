@@ -185,6 +185,49 @@ public class ShellParser {
             }
         }
 
+        // Emitting any remaining token after end of input
+        if (!current.isEmpty()) {
+            tokens.add(new Token(current.toString(), TokenType.WORD));
+        }
+
+        // Splitting tokens into Segment objects
+        // Traverse the token list accumulating WORDs into the current segment
+        // On REDIRECT/APPEND: consume the next WORD as the redirect target
+        // ON PIPE/AND/SEMICOLON: finalize the current segment, record operator.
+        List<String> currentWords = new java.util.ArrayList<>();
+        RedirectInfo currentRedirect = null;
+        boolean expectRedirectTarget = false;
+        String pendingRedirectOp = null;
+
+        for (Token tok : tokens) {
+            if (expectRedirectTarget) {
+                // The token immediately after > or >> is considered the target file path
+                if (tok.type == TokenType.WORD) {
+                    currentRedirect = new RedirectInfo(pendingRedirectOp, tok.value);
+                    expectRedirectTarget = false;
+                    pendingRedirectOp = null;
+                    continue;
+                }
+                // For improper input i.e. no target provided, reset
+
+                expectRedirectTarget = false;
+                pendingRedirectOp = null;
+            }
+
+            switch (tok.type) {
+            case WORD:
+                currentWords.add(tok.value);
+                break;
+            case REDIRECT:
+                expectRedirectTarget = true;
+                pendingRedirectOp = ">";
+                break;
+            case APPEND:
+                expectRedirectTarget = true;
+                pendingRedirectOp = ">>";
+            }
+        }
+
         return null;
     }
 
