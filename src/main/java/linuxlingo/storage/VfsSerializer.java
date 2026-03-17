@@ -1,7 +1,15 @@
 package linuxlingo.storage;
 
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import linuxlingo.shell.vfs.Directory;
+import linuxlingo.shell.vfs.FileNode;
+import linuxlingo.shell.vfs.Permission;
+import linuxlingo.shell.vfs.RegularFile;
 import linuxlingo.shell.vfs.VirtualFileSystem;
 
 /**
@@ -77,17 +85,15 @@ public class VfsSerializer {
      * @return the complete {@code .env} file content as a String
      */
     public static String serialize(VirtualFileSystem vfs, String workingDir) {
-        // TODO: Implement serialization
-        //  1. Build header: "# LinuxLingo Virtual File System Snapshot\n"
-        //     + "# Saved: " + timestamp + "\n"
-        //     + "# Working Directory: " + workingDir + "\n"
-        //  2. Recursively walk vfs.getRoot():
-        //     - DIR  nodes: "DIR  | <absolutePath> | <permissions>\n"
-        //     - FILE nodes: "FILE | <absolutePath> | <permissions> | <escapedContent>\n"
-        //     Use node.getAbsolutePath(), node.getPermission().toString(),
-        //     and ((RegularFile) node).getContent()
-        //  3. Return the assembled string
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.serialize()");
+        String effectiveWorkingDir = (workingDir == null || workingDir.isBlank()) ? "/" : workingDir;
+        StringBuilder sb = new StringBuilder();
+        sb.append("# LinuxLingo Virtual File System Snapshot\n");
+        sb.append("# Saved: ").append(LocalDateTime.now()).append("\n");
+        sb.append("# Working Directory: ").append(effectiveWorkingDir).append("\n");
+        sb.append("#\n");
+        sb.append("# Format: TYPE | PATH | PERMISSIONS | CONTENT\n\n");
+        appendNode(vfs.getRoot(), sb);
+        return sb.toString();
     }
 
     /**
@@ -105,19 +111,71 @@ public class VfsSerializer {
      * @return a {@link DeserializedVfs} containing the VFS and working directory
      */
     public static DeserializedVfs deserialize(String text) {
-        // TODO: Implement deserialization
-        //  1. Start with root = new Directory("", new Permission("rwxr-xr-x"))
-        //  2. Scan lines:
-        //     - "# Working Directory: <path>" → extract workingDir
-        //     - Skip blank lines and other comments
-        //     - Data lines: split by " | " (limit 4)
-        //       parts[0] = TYPE (DIR/FILE), parts[1] = path,
-        //       parts[2] = permissions, parts[3] = content (FILE only)
-        //  3. For each data line, walk/create parent directories, then add node
-        //     Use new Permission(permString), new Directory(name, perm),
-        //     new RegularFile(name, perm, unescapeContent(content))
-        //  4. Return new DeserializedVfs(new VirtualFileSystem(root), workingDir)
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.deserialize()");
+        Directory root = new Directory("", new Permission("rwxr-xr-x"));
+        String workingDir = "/";
+
+        String[] lines = text == null ? new String[0] : text.split("\\R");
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            if (line.startsWith("# Working Directory:")) {
+                String value = line.substring("# Working Directory:".length()).trim();
+                if (!value.isEmpty()) {
+                    workingDir = value;
+                }
+                continue;
+            }
+            if (line.startsWith("#")) {
+                continue;
+            }
+
+            String[] parts = line.split(" \\| ", 4);
+            if (parts.length < 3) {
+                continue;
+            }
+            String type = parts[0].trim();
+            String path = parts[1].trim();
+            String permString = parts[2].trim();
+            Permission permission = new Permission(permString);
+
+            if ("/".equals(path) && "DIR".equals(type)) {
+                root.setPermission(permission);
+                continue;
+            }
+
+            String[] pathParts = splitAbsolutePath(path);
+            if (pathParts.length == 0) {
+                continue;
+            }
+
+            Directory parent = ensureParentDirectories(root, pathParts);
+            String name = pathParts[pathParts.length - 1];
+            FileNode existing = parent.getChild(name);
+
+            if ("DIR".equals(type)) {
+                if (existing != null && existing.isDirectory()) {
+                    existing.setPermission(permission);
+                } else if (existing == null) {
+                    parent.addChild(new Directory(name, permission));
+                }
+                continue;
+            }
+
+            if ("FILE".equals(type)) {
+                String escapedContent = parts.length == 4 ? parts[3] : "";
+                String content = unescapeContent(escapedContent);
+                if (existing != null && !existing.isDirectory()) {
+                    existing.setPermission(permission);
+                    ((RegularFile) existing).setContent(content);
+                } else if (existing == null) {
+                    parent.addChild(new RegularFile(name, permission, content));
+                }
+            }
+        }
+
+        return new DeserializedVfs(new VirtualFileSystem(root), workingDir);
     }
 
     // ─── File-level operations ───────────────────────────────────
@@ -132,11 +190,9 @@ public class VfsSerializer {
      */
     public static void saveToFile(VirtualFileSystem vfs, String workingDir,
                                   String name) throws StorageException {
-        // TODO: Implement save-to-file
-        //  1. String content = serialize(vfs, workingDir);
-        //  2. Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
-        //  3. Storage.writeFile(path, content);   // handles mkdir + IOException wrapping
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.saveToFile()");
+        String content = serialize(vfs, workingDir);
+        Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
+        Storage.writeFile(path, content);
     }
 
     /**
@@ -147,12 +203,12 @@ public class VfsSerializer {
      * @throws StorageException if the file does not exist or cannot be read
      */
     public static DeserializedVfs loadFromFile(String name) throws StorageException {
-        // TODO: Implement load-from-file
-        //  1. Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
-        //  2. if (!Storage.exists(path)) throw new StorageException("Environment not found: " + name);
-        //  3. String content = Storage.readFile(path);
-        //  4. return deserialize(content);
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.loadFromFile()");
+        Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
+        if (!Storage.exists(path)) {
+            throw new StorageException("Environment not found: " + name);
+        }
+        String content = Storage.readFile(path);
+        return deserialize(content);
     }
 
     /**
@@ -161,12 +217,17 @@ public class VfsSerializer {
      * @return list of environment names, or empty list if none
      */
     public static List<String> listEnvironments() {
-        // TODO: Implement list
-        //  1. Path dir = Storage.getDataSubDir("environments");
-        //  2. List<Path> files = Storage.listFiles(dir, ".env");
-        //  3. Map each Path → file name without ".env" extension, collect to list
-        //     e.g. path.getFileName().toString().replace(".env", "")
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.listEnvironments()");
+        Path dir = Storage.getDataSubDir("environments");
+        List<Path> files = Storage.listFiles(dir, ".env");
+        List<String> names = new ArrayList<>();
+        for (Path file : files) {
+            String filename = file.getFileName().toString();
+            if (filename.endsWith(".env")) {
+                names.add(filename.substring(0, filename.length() - 4));
+            }
+        }
+        Collections.sort(names);
+        return names;
     }
 
     /**
@@ -176,10 +237,8 @@ public class VfsSerializer {
      * @return true if the file was deleted, false if it did not exist
      */
     public static boolean deleteEnvironment(String name) {
-        // TODO: Implement delete
-        //  1. Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
-        //  2. return Storage.delete(path);
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.deleteEnvironment()");
+        Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
+        return Storage.delete(path);
     }
 
     // ─── Escaping helpers ────────────────────────────────────────
@@ -196,9 +255,13 @@ public class VfsSerializer {
      * @return escaped content safe for one line of .env format
      */
     static String escapeContent(String raw) {
-        // TODO: Implement escaping
-        //  Apply replacements in order: \ → \\, \n → \\n, | → \|
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.escapeContent()");
+        if (raw == null) {
+            return "";
+        }
+        return raw
+                .replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace("|", "\\|");
     }
 
     /**
@@ -208,9 +271,79 @@ public class VfsSerializer {
      * @return the original file content with real newlines and pipes
      */
     static String unescapeContent(String escaped) {
-        // TODO: Implement unescaping
-        //  Iterate chars: when encountering '\', check next char:
-        //    'n' → newline, '|' → pipe, '\\' → backslash
-        throw new UnsupportedOperationException("TODO: implement VfsSerializer.unescapeContent()");
+        if (escaped == null || escaped.isEmpty()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < escaped.length(); i++) {
+            char c = escaped.charAt(i);
+            if (c == '\\' && i + 1 < escaped.length()) {
+                char next = escaped.charAt(i + 1);
+                if (next == 'n') {
+                    result.append('\n');
+                    i++;
+                } else if (next == '|') {
+                    result.append('|');
+                    i++;
+                } else if (next == '\\') {
+                    result.append('\\');
+                    i++;
+                } else {
+                    result.append(next);
+                    i++;
+                }
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
+    }
+
+    private static void appendNode(FileNode node, StringBuilder sb) {
+        if (node.isDirectory()) {
+            sb.append("DIR  | ")
+                    .append(node.getAbsolutePath())
+                    .append(" | ")
+                    .append(node.getPermission())
+                    .append(" |\n");
+            for (FileNode child : ((Directory) node).getChildren()) {
+                appendNode(child, sb);
+            }
+            return;
+        }
+        RegularFile file = (RegularFile) node;
+        sb.append("FILE | ")
+                .append(file.getAbsolutePath())
+                .append(" | ")
+                .append(file.getPermission())
+                .append(" | ")
+                .append(escapeContent(file.getContent()))
+                .append("\n");
+    }
+
+    private static String[] splitAbsolutePath(String path) {
+        if (path == null || path.isEmpty() || "/".equals(path)) {
+            return new String[0];
+        }
+        String normalized = path.startsWith("/") ? path.substring(1) : path;
+        return normalized.isEmpty() ? new String[0] : normalized.split("/");
+    }
+
+    private static Directory ensureParentDirectories(Directory root, String[] pathParts) {
+        Directory current = root;
+        for (int i = 0; i < pathParts.length - 1; i++) {
+            String part = pathParts[i];
+            FileNode child = current.getChild(part);
+            if (child == null) {
+                Directory newDir = new Directory(part, new Permission("rwxr-xr-x"));
+                current.addChild(newDir);
+                current = newDir;
+            } else if (child.isDirectory()) {
+                current = (Directory) child;
+            } else {
+                throw new IllegalArgumentException("Invalid snapshot: parent is not a directory: " + part);
+            }
+        }
+        return current;
     }
 }
