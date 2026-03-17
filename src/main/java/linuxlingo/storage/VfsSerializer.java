@@ -305,7 +305,7 @@ public class VfsSerializer {
                     .append(node.getAbsolutePath())
                     .append(" | ")
                     .append(node.getPermission())
-                    .append(" |\n");
+                    .append("\n");
             for (FileNode child : ((Directory) node).getChildren()) {
                 appendNode(child, sb);
             }
