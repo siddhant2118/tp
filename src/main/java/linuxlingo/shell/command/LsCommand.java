@@ -1,7 +1,13 @@
 package linuxlingo.shell.command;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
+import linuxlingo.shell.vfs.FileNode;
+import linuxlingo.shell.vfs.RegularFile;
+import linuxlingo.shell.vfs.VfsException;
 
 /**
  * Lists directory contents.
@@ -12,17 +18,47 @@ import linuxlingo.shell.ShellSession;
 public class LsCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement ls
-        //  1. Parse flags: -l (long format), -a (show hidden)
-        //  2. Determine target path (default: session.getWorkingDir())
-        //  3. List<FileNode> children = session.getVfs().listDirectory(path, session.getWorkingDir(), showHidden)
-        //     Catch VfsException → return CommandResult.error("ls: " + e.getMessage())
-        //  4. Format output:
-        //     Plain: name (append '/' if child.isDirectory())
-        //     Long (-l): permission.toString() + "  " + size + "  " + name[/]
-        //       where size = ((RegularFile) child).getContent().length() for files, 0 for dirs
-        //  5. Return CommandResult.success(joined output)
-        throw new UnsupportedOperationException("TODO: implement LsCommand");
+        boolean longFormat = false;
+        boolean showHidden = false;
+        String targetPath = session.getWorkingDir();
+        boolean hasExplicitPath = false;
+
+        for (String arg : args) {
+            if (arg.startsWith("-") && arg.length() > 1) {
+                for (int i = 1; i < arg.length(); i++) {
+                    char option = arg.charAt(i);
+                    if (option == 'l') {
+                        longFormat = true;
+                    } else if (option == 'a') {
+                        showHidden = true;
+                    } else {
+                        return CommandResult.error("ls: invalid option -- " + option);
+                    }
+                }
+            } else if (!hasExplicitPath) {
+                targetPath = arg;
+                hasExplicitPath = true;
+            } else {
+                return CommandResult.error("ls: too many arguments");
+            }
+        }
+
+        try {
+            List<FileNode> children = session.getVfs().listDirectory(targetPath, session.getWorkingDir(), showHidden);
+            List<String> lines = new ArrayList<>();
+            for (FileNode child : children) {
+                String name = child.getName() + (child.isDirectory() ? "/" : "");
+                if (!longFormat) {
+                    lines.add(name);
+                    continue;
+                }
+                int size = child.isDirectory() ? 0 : ((RegularFile) child).getSize();
+                lines.add(child.getPermission().toString() + "  " + size + "  " + name);
+            }
+            return CommandResult.success(String.join("\n", lines));
+        } catch (VfsException e) {
+            return CommandResult.error("ls: " + e.getMessage());
+        }
     }
 
     @Override
