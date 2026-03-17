@@ -1,7 +1,10 @@
 package linuxlingo.exam;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import linuxlingo.cli.Ui;
 import linuxlingo.exam.question.PracQuestion;
@@ -31,6 +34,7 @@ import linuxlingo.shell.vfs.VirtualFileSystem;
  * @see ExamResult
  */
 public class ExamSession {
+    private static final Logger LOGGER = Logger.getLogger(ExamSession.class.getName());
     private final QuestionBank questionBank;
     private final Ui ui;
     private final Supplier<VirtualFileSystem> vfsFactory;
@@ -42,9 +46,9 @@ public class ExamSession {
      *                   (typically {@code VirtualFileSystem::new})
      */
     public ExamSession(QuestionBank bank, Ui ui, Supplier<VirtualFileSystem> vfsFactory) {
-        this.questionBank = bank;
-        this.ui = ui;
-        this.vfsFactory = vfsFactory;
+        this.questionBank = Objects.requireNonNull(bank, "questionBank must not be null");
+        this.ui = Objects.requireNonNull(ui, "ui must not be null");
+        this.vfsFactory = Objects.requireNonNull(vfsFactory, "vfsFactory must not be null");
     }
 
     /**
@@ -60,6 +64,7 @@ public class ExamSession {
         listTopics();
         String topicInput = ui.readLine("Select topic (number or name): ");
         if (topicInput == null) {
+            LOGGER.fine("Topic selection input was null");
             ui.println("Invalid topic selection.");
             return;
         }
@@ -78,6 +83,7 @@ public class ExamSession {
         }
 
         if (selectedTopic == null) {
+            LOGGER.log(Level.INFO, "Invalid interactive topic selection: {0}", trimmedTopicInput);
             ui.println("Invalid topic selection.");
             return;
         }
@@ -90,6 +96,7 @@ public class ExamSession {
             try {
                 count = Integer.parseInt(countInput.trim());
             } catch (NumberFormatException e) {
+                LOGGER.log(Level.INFO, "Invalid interactive count ''{0}'', defaulting to total", countInput);
                 count = total;
             }
         } else {
@@ -110,7 +117,11 @@ public class ExamSession {
      * @param random whether to shuffle
      */
     public void startWithArgs(String topic, int count, boolean random) {
+        if (topic == null || topic.trim().isEmpty()) {
+            throw new IllegalArgumentException("topic must not be null or blank");
+        }
         if (!questionBank.hasTopic(topic)) {
+            LOGGER.log(Level.INFO, "Topic not found in startWithArgs: {0}", topic);
             ui.println("Invalid topic selection.");
             listTopics();
             return;
@@ -160,9 +171,10 @@ public class ExamSession {
      * Run through a list of questions, accumulate results.
      */
     private ExamResult runExam(List<Question> questions) {
+        Objects.requireNonNull(questions, "questions must not be null");
         ExamResult result = new ExamResult();
         for (int i = 0; i < questions.size(); i++) {
-            Question q = questions.get(i);
+            Question q = Objects.requireNonNull(questions.get(i), "question must not be null");
 
             if (q instanceof PracQuestion pq) {
                 boolean correct = handlePracQuestion(pq);
@@ -171,6 +183,7 @@ public class ExamSession {
                 ui.println("[Q" + (i + 1) + "/" + questions.size() + "] " + q.present());
                 String userAnswer = ui.readLine("Your answer: ");
                 if (userAnswer == null || userAnswer.trim().equalsIgnoreCase("quit")) {
+                    LOGGER.log(Level.FINE, "Question skipped by user at index {0}", i + 1);
                     result.addResult(q, "", false);
                 } else {
                     boolean correct = q.checkAnswer(userAnswer);
@@ -200,6 +213,10 @@ public class ExamSession {
      * @return true if the user answered correctly
      */
     private boolean presentQuestion(Question q, int index, int total) {
+        Objects.requireNonNull(q, "question must not be null");
+        if (index <= 0 || total <= 0) {
+            throw new IllegalArgumentException("index and total must be positive");
+        }
         if (q instanceof PracQuestion pq) {
             ui.println("[Q" + index + "/" + total + "] " + q.present());
             return handlePracQuestion(pq);
@@ -214,10 +231,14 @@ public class ExamSession {
      * @return true if VFS matches all checkpoints
      */
     private boolean handlePracQuestion(PracQuestion q) {
+        Objects.requireNonNull(q, "prac question must not be null");
         ui.println(">> Entering Shell Simulator...");
         ui.println("   Complete the task and type 'done' when finished.\n");
 
         VirtualFileSystem tempVfs = vfsFactory.get();
+        if (tempVfs == null) {
+            throw new IllegalStateException("vfsFactory returned null VirtualFileSystem");
+        }
         ShellSession tempSession = new ShellSession(tempVfs, ui);
         tempSession.start();
 

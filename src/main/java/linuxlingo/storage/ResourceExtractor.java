@@ -5,6 +5,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Extracts bundled question bank resources from the JAR on first run.
@@ -31,6 +34,7 @@ import java.nio.file.StandardCopyOption;
  * Uses {@link Class#getResourceAsStream(String)} to read from the JAR.
  */
 public class ResourceExtractor {
+    private static final Logger LOGGER = Logger.getLogger(ResourceExtractor.class.getName());
 
     private static final String[] BUNDLED_QUESTIONS = {
         "file-management.txt",
@@ -47,8 +51,9 @@ public class ResourceExtractor {
      * @throws StorageException if directory creation or file copy fails
      */
     public static void extractIfNeeded(Path dataDir) throws StorageException {
-        Path questionsDir = dataDir.resolve("questions");
-        Path environmentsDir = dataDir.resolve("environments");
+        Path validatedDataDir = Objects.requireNonNull(dataDir, "dataDir must not be null");
+        Path questionsDir = validatedDataDir.resolve("questions");
+        Path environmentsDir = validatedDataDir.resolve("environments");
 
         if (!Files.exists(questionsDir)) {
             Storage.ensureDirectory(questionsDir);
@@ -56,6 +61,7 @@ public class ResourceExtractor {
                 try {
                     extractResource("/questions/" + fileName, questionsDir.resolve(fileName));
                 } catch (IOException e) {
+                    LOGGER.log(Level.WARNING, "Failed to extract resource: " + fileName, e);
                     throw new StorageException("Failed to extract resource: " + fileName, e);
                 }
             }
@@ -64,6 +70,8 @@ public class ResourceExtractor {
         if (!Files.exists(environmentsDir)) {
             Storage.ensureDirectory(environmentsDir);
         }
+
+        assert Files.exists(environmentsDir) : "environments directory should exist after extraction";
     }
 
     /**
@@ -74,6 +82,8 @@ public class ResourceExtractor {
      * @throws IOException if the resource cannot be read or the file cannot be written
      */
     private static void extractResource(String resourcePath, Path targetPath) throws IOException {
+        Objects.requireNonNull(resourcePath, "resourcePath must not be null");
+        Objects.requireNonNull(targetPath, "targetPath must not be null");
         try (InputStream is = ResourceExtractor.class.getResourceAsStream(resourcePath)) {
             if (is == null) {
                 throw new IOException("Bundled resource not found: " + resourcePath);
