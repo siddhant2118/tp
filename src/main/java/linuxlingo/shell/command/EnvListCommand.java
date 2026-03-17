@@ -1,7 +1,10 @@
 package linuxlingo.shell.command;
 
+import java.util.List;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
+import linuxlingo.storage.VfsSerializer;
 
 /**
  * Lists all saved environment names.
@@ -11,12 +14,18 @@ import linuxlingo.shell.ShellSession;
 public class EnvListCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement envlist
-        //  1. List<String> names = VfsSerializer.listEnvironments()
-        //  2. If names is empty → return CommandResult.success("No saved environments.")
-        //  3. Otherwise, format as "Saved environments:\n  name1\n  name2\n  ..."
-        //     return CommandResult.success(formatted)
-        throw new UnsupportedOperationException("TODO: implement EnvListCommand");
+        if (args.length > 0) {
+            return CommandResult.error("envlist: usage: " + getUsage());
+        }
+        List<String> names = VfsSerializer.listEnvironments();
+        if (names.isEmpty()) {
+            return CommandResult.success("No saved environments.");
+        }
+        StringBuilder output = new StringBuilder("Saved environments:");
+        for (String name : names) {
+            output.append("\n  ").append(name);
+        }
+        return CommandResult.success(output.toString());
     }
 
     @Override

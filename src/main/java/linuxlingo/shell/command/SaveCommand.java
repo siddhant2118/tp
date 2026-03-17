@@ -2,6 +2,8 @@ package linuxlingo.shell.command;
 
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
+import linuxlingo.storage.StorageException;
+import linuxlingo.storage.VfsSerializer;
 
 /**
  * Saves the current VFS state to a named environment file.
@@ -12,14 +14,19 @@ import linuxlingo.shell.ShellSession;
 public class SaveCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement save
-        //  1. Validate args: exactly one name required
-        //  2. Validate name: alphanumeric, hyphens, underscores only
-        //     e.g. name.matches("[a-zA-Z0-9_-]+")
-        //  3. Call VfsSerializer.saveToFile(session.getVfs(), session.getWorkingDir(), name)
-        //     Catch StorageException → return CommandResult.error("save: " + e.getMessage())
-        //  4. Return CommandResult.success("Environment saved: " + name)
-        throw new UnsupportedOperationException("TODO: implement SaveCommand");
+        if (args.length != 1) {
+            return CommandResult.error("save: usage: " + getUsage());
+        }
+        String name = args[0];
+        if (!name.matches("[a-zA-Z0-9_-]+")) {
+            return CommandResult.error("save: invalid environment name: " + name);
+        }
+        try {
+            VfsSerializer.saveToFile(session.getVfs(), session.getWorkingDir(), name);
+            return CommandResult.success("Environment saved: " + name);
+        } catch (StorageException e) {
+            return CommandResult.error("save: " + e.getMessage());
+        }
     }
 
     @Override

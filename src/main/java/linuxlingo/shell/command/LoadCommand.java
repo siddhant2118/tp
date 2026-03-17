@@ -2,6 +2,8 @@ package linuxlingo.shell.command;
 
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
+import linuxlingo.storage.StorageException;
+import linuxlingo.storage.VfsSerializer;
 
 /**
  * Loads a previously saved VFS environment and replaces the current one.
@@ -12,14 +14,19 @@ import linuxlingo.shell.ShellSession;
 public class LoadCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement load
-        //  1. Validate args: exactly one name required
-        //  2. VfsSerializer.DeserializedVfs result = VfsSerializer.loadFromFile(name)
-        //     Catch StorageException → return CommandResult.error("load: " + e.getMessage())
-        //  3. session.replaceVfs(result.getVfs())
-        //  4. session.setWorkingDir(result.getWorkingDir())
-        //  5. Return CommandResult.success("Environment loaded: " + name)
-        throw new UnsupportedOperationException("TODO: implement LoadCommand");
+        if (args.length != 1) {
+            return CommandResult.error("load: usage: " + getUsage());
+        }
+        String name = args[0];
+        try {
+            VfsSerializer.DeserializedVfs result = VfsSerializer.loadFromFile(name);
+            session.replaceVfs(result.getVfs());
+            session.setWorkingDir(result.getWorkingDir());
+            session.setPreviousDir(null);
+            return CommandResult.success("Environment loaded: " + name);
+        } catch (StorageException e) {
+            return CommandResult.error("load: " + e.getMessage());
+        }
     }
 
     @Override
