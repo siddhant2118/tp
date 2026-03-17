@@ -4,6 +4,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import linuxlingo.exam.Checkpoint;
 import linuxlingo.exam.QuestionBank;
@@ -41,6 +45,7 @@ import linuxlingo.exam.question.Question;
  * @see QuestionBank#load(Path)
  */
 public class QuestionParser {
+    private static final Logger LOGGER = Logger.getLogger(QuestionParser.class.getName());
 
     /**
      * Parse a single question bank file into a list of questions.
@@ -50,10 +55,12 @@ public class QuestionParser {
      * @throws StorageException if the file cannot be read
      */
     public static List<Question> parseFile(Path path) throws StorageException {
-        List<String> lines = Storage.readLines(path);
+        Path validatedPath = Objects.requireNonNull(path, "path must not be null");
+        List<String> lines = Storage.readLines(validatedPath);
         List<Question> questions = new ArrayList<>();
 
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             String trimmedLine = line.trim();
             if (trimmedLine.isEmpty() || trimmedLine.startsWith("#")) {
                 continue;
@@ -61,10 +68,12 @@ public class QuestionParser {
 
             String[] fields = trimmedLine.split("\\s+\\|\\s+", 6);
             if (fields.length < 4) {
+                LOGGER.log(Level.WARNING, "Skipping malformed question line {0} in {1}",
+                        new Object[]{i + 1, validatedPath});
                 continue;
             }
 
-            String type = fields[0].trim().toUpperCase();
+            String type = fields[0].trim().toUpperCase(Locale.ROOT);
             Question.Difficulty difficulty = parseDifficulty(fields[1].trim());
             String questionText = fields[2].trim();
             String answer = fields[3].trim();
@@ -83,12 +92,17 @@ public class QuestionParser {
                     questions.add(parsePrac(questionText, answer, explanation, difficulty));
                     break;
                 default:
+                    LOGGER.log(Level.WARNING, "Skipping unknown question type ''{0}'' at line {1} in {2}",
+                            new Object[]{type, i + 1, validatedPath});
                     break;
                 }
             } catch (RuntimeException e) {
-                // Skip malformed question lines and continue loading the rest of the file.
+                LOGGER.log(Level.WARNING,
+                        "Skipping invalid question entry at line " + (i + 1) + " in " + validatedPath, e);
             }
         }
+
+        assert questions.stream().noneMatch(Objects::isNull) : "Parsed question list should not contain null entries";
 
         return questions;
     }
@@ -102,6 +116,9 @@ public class QuestionParser {
     private static McqQuestion parseMcq(String questionText, String answer,
                                         String options, String explanation,
                                         Question.Difficulty difficulty) {
+        if (answer == null || answer.trim().isEmpty()) {
+            throw new IllegalArgumentException("MCQ answer must not be blank");
+        }
         LinkedHashMap<Character, String> optionMap = new LinkedHashMap<>();
         String[] optParts = options.split("(?=[A-D]:)");
         for (String part : optParts) {
@@ -110,7 +127,13 @@ public class QuestionParser {
                 optionMap.put(trimmedPart.charAt(0), trimmedPart.substring(2).trim());
             }
         }
+        if (optionMap.isEmpty()) {
+            throw new IllegalArgumentException("MCQ options must not be empty");
+        }
         char correctAnswer = answer.charAt(0);
+        if (!optionMap.containsKey(Character.toUpperCase(correctAnswer))) {
+            throw new IllegalArgumentException("MCQ correct answer not found in options");
+        }
         return new McqQuestion(questionText, explanation, difficulty, optionMap, correctAnswer);
     }
 
@@ -129,6 +152,9 @@ public class QuestionParser {
             if (!trimmedAnswer.isEmpty()) {
                 accepted.add(trimmedAnswer);
             }
+        }
+        if (accepted.isEmpty()) {
+            throw new IllegalArgumentException("FITB accepted answer list must not be empty");
         }
         return new FitbQuestion(questionText, explanation, difficulty, accepted);
     }
@@ -149,7 +175,12 @@ public class QuestionParser {
                 Checkpoint.NodeType nodeType = checkpointParts[1].trim().equalsIgnoreCase("DIR")
                         ? Checkpoint.NodeType.DIR : Checkpoint.NodeType.FILE;
                 checkpoints.add(new Checkpoint(checkpointParts[0].trim(), nodeType));
+            } else {
+                throw new IllegalArgumentException("Invalid PRAC checkpoint format: " + part);
             }
+        }
+        if (checkpoints.isEmpty()) {
+            throw new IllegalArgumentException("PRAC checkpoints must not be empty");
         }
         return new PracQuestion(questionText, explanation, difficulty, checkpoints);
     }
@@ -159,7 +190,10 @@ public class QuestionParser {
      * Defaults to {@code MEDIUM} for unknown values.
      */
     private static Question.Difficulty parseDifficulty(String diff) {
-        return switch (diff.toUpperCase()) {
+        if (diff == null) {
+            return Question.Difficulty.MEDIUM;
+        }
+        return switch (diff.toUpperCase(Locale.ROOT)) {
         case "EASY" -> Question.Difficulty.EASY;
         case "MEDIUM" -> Question.Difficulty.MEDIUM;
         case "HARD" -> Question.Difficulty.HARD;
@@ -175,7 +209,11 @@ public class QuestionParser {
      * @return topic name (e.g. "navigation", "permissions")
      */
     public static String getTopicName(Path path) {
-        String fileName = path.getFileName().toString();
+        Path validatedPath = Objects.requireNonNull(path, "path must not be null");
+        if (validatedPath.getFileName() == null) {
+            throw new IllegalArgumentException("path must include a file name");
+        }
+        String fileName = validatedPath.getFileName().toString();
         if (fileName.endsWith(".txt")) {
             return fileName.substring(0, fileName.length() - 4);
         }
