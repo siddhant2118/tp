@@ -1,7 +1,10 @@
 package linuxlingo.storage;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Extracts bundled question bank resources from the JAR on first run.
@@ -44,18 +47,23 @@ public class ResourceExtractor {
      * @throws StorageException if directory creation or file copy fails
      */
     public static void extractIfNeeded(Path dataDir) throws StorageException {
-        // TODO: Implement extractIfNeeded
-        //  1. Path questionsDir = dataDir.resolve("questions")
-        //     Path environmentsDir = dataDir.resolve("environments")
-        //  2. If !Files.exists(questionsDir):
-        //     a. Storage.ensureDirectory(questionsDir)
-        //     b. For each fileName in BUNDLED_QUESTIONS:
-        //        extractResource("/questions/" + fileName, questionsDir.resolve(fileName))
-        //  3. If !Files.exists(environmentsDir):
-        //     Storage.ensureDirectory(environmentsDir)
-        //  Wrap IOException in StorageException
+        Path questionsDir = dataDir.resolve("questions");
+        Path environmentsDir = dataDir.resolve("environments");
 
-        // Stub: no-op until implemented
+        if (!Files.exists(questionsDir)) {
+            Storage.ensureDirectory(questionsDir);
+            for (String fileName : BUNDLED_QUESTIONS) {
+                try {
+                    extractResource("/questions/" + fileName, questionsDir.resolve(fileName));
+                } catch (IOException e) {
+                    throw new StorageException("Failed to extract resource: " + fileName, e);
+                }
+            }
+        }
+
+        if (!Files.exists(environmentsDir)) {
+            Storage.ensureDirectory(environmentsDir);
+        }
     }
 
     /**
@@ -66,11 +74,11 @@ public class ResourceExtractor {
      * @throws IOException if the resource cannot be read or the file cannot be written
      */
     private static void extractResource(String resourcePath, Path targetPath) throws IOException {
-        // TODO: Implement extractResource
-        //  1. InputStream is = ResourceExtractor.class.getResourceAsStream(resourcePath)
-        //  2. If is != null:
-        //     Files.copy(is, targetPath, StandardCopyOption.REPLACE_EXISTING)
-        //     is.close()
-        throw new UnsupportedOperationException("TODO: implement ResourceExtractor.extractResource()");
+        try (InputStream is = ResourceExtractor.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new IOException("Bundled resource not found: " + resourcePath);
+            }
+            Files.copy(is, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }
