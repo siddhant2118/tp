@@ -1,5 +1,7 @@
 package linuxlingo.shell.command;
 
+import java.util.Map;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 
@@ -12,12 +14,22 @@ import linuxlingo.shell.ShellSession;
 public class HelpCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement help
-        //  1. No args → return session.getRegistry().getHelpText()
-        //  2. With arg → Command cmd = session.getRegistry().get(args[0])
-        //     If cmd == null → return CommandResult.error("help: unknown command: " + args[0])
-        //     Otherwise → return "Usage: " + cmd.getUsage() + "\n" + cmd.getDescription()
-        throw new UnsupportedOperationException("TODO: implement HelpCommand");
+        if (args.length == 0) {
+            StringBuilder out = new StringBuilder("Available commands:");
+            for (Map.Entry<String, String> entry : session.getRegistry().getHelpText().entrySet()) {
+                out.append("\n  ")
+                        .append(entry.getKey())
+                        .append(" - ")
+                        .append(entry.getValue());
+            }
+            return CommandResult.success(out.toString());
+        }
+
+        Command command = session.getRegistry().get(args[0]);
+        if (command == null) {
+            return CommandResult.error("help: unknown command: " + args[0]);
+        }
+        return CommandResult.success("Usage: " + command.getUsage() + "\n" + command.getDescription());
     }
 
     @Override

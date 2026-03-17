@@ -11,10 +11,8 @@ import linuxlingo.shell.ShellSession;
 public class ClearCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO: Implement clear
-        //  Call session.getUi().clearScreen()
-        //  Return success with empty output
-        throw new UnsupportedOperationException("TODO: implement ClearCommand");
+        session.getUi().clearScreen();
+        return CommandResult.success("");
     }
 
     @Override
