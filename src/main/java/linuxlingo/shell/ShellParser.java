@@ -1,6 +1,7 @@
 package linuxlingo.shell;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Transforms a raw input string into a structured execution plan.
@@ -26,6 +27,8 @@ import java.util.List;
  */
 public class ShellParser {
 
+    private static final Logger LOGGER =  Logger.getLogger(ShellParser.class.getName());
+
     public enum TokenType {
         WORD, PIPE, REDIRECT, APPEND, AND, SEMICOLON
     }
@@ -34,7 +37,14 @@ public class ShellParser {
         public final String value;
         public final TokenType type;
 
-        public Token(String value, TokenType type) {
+        public Token(String value, TokenType type) throws IllegalArgumentException {
+            if (value == null) {
+                throw new IllegalArgumentException("Token value must not be null");
+            }
+            if (type == null) {
+                throw new IllegalArgumentException("Token type must not be null");
+            }
+
             this.value = value;
             this.type = type;
         }
@@ -51,6 +61,12 @@ public class ShellParser {
         public final String target;   // file path
 
         public RedirectInfo(String operator, String target) {
+            if (!">".equals(operator) && !">>".equals(operator)) {
+                throw new IllegalArgumentException("RedirectInfo operator must be '>' or '>>', got: " + operator);
+            }
+            if (target == null || target.isBlank()) {
+                throw new IllegalArgumentException("RedirectInfo target must no be null or blank");
+            }
             this.operator = operator;
             this.target = target;
         }
@@ -66,6 +82,13 @@ public class ShellParser {
         public final RedirectInfo redirect;
 
         public Segment(String commandName, String[] args, RedirectInfo redirect) {
+            if (commandName == null || commandName.isBlank()) {
+                throw new IllegalArgumentException("Segment commandName must not be null or blank");
+            }
+            if (args == null) {
+                throw new IllegalArgumentException("Segment args must not be null");
+            }
+
             this.commandName = commandName;
             this.args = args;
             this.redirect = redirect;
@@ -77,6 +100,17 @@ public class ShellParser {
         public final List<TokenType> operators;
 
         public ParsedPlan(List<Segment> segments, List<TokenType> operators) {
+            if (segments == null) {
+                throw new IllegalArgumentException("ParsedPlan segments must not be null");
+            }
+            if (operators == null) {
+                throw new IllegalArgumentException("ParsedPLan operators must not be null");
+            }
+
+            assert operators.size() == Math.max(0,segments.size() - 1)
+                : "operators.size()=" + operators.size()
+                        + " but segments.size()=" + segments.size();
+
             this.segments = segments;
             this.operators = operators;
         }
@@ -93,14 +127,17 @@ public class ShellParser {
      *   <li>Within each segment, extract command name, args, and optional redirect info.</li>
      * </ol>
      */
-    public ParsedPlan parse(String input) {
+    public ParsedPlan parse(String input) throws IllegalArgumentException {
         List<Segment> segments = new java.util.ArrayList<>();
         List<TokenType> operators = new java.util.ArrayList<>();
 
         // Edge case
         if (input == null || input.trim().isEmpty()) {
+            LOGGER.fine("parse() called with null or blank input - returning empty plan");
             return new ParsedPlan(segments, operators);
         }
+
+        LOGGER.fine("Parsing input: " + input);
 
         // Tokenizer (char-by-char state machine)
         List<Token> tokens = new java.util.ArrayList<>();
@@ -169,19 +206,18 @@ public class ShellParser {
                 }
                 break;
             default:
+                assert false : "Unhandled tokenizer state: " + state;
                 break;
             }
         }
 
-        // Emitting any remaining token after end of input
-        if (!current.isEmpty()) {
-            tokens.add(new Token(current.toString(), TokenType.WORD));
-        }
+        // Flushing any remaining token
+        flushCurrentToken(current, tokens);
 
         // Splitting tokens into Segment objects
         // Traverse the token list accumulating WORDs into the current segment
         // On REDIRECT/APPEND: consume the next WORD as the redirect target
-        // ON PIPE/AND/SEMICOLON: finalize the current segment, record operator.
+        // ON PIPE/AND/SEMICOLON: finalize the current segment, record operator
         List<String> currentWords = new java.util.ArrayList<>();
         RedirectInfo currentRedirect = null;
         boolean expectRedirectTarget = false;
@@ -233,6 +269,13 @@ public class ShellParser {
             segments.add(buildSegment(currentWords, currentRedirect));
         }
 
+        assert operators.size() == Math.max(0, segments.size() - 1)
+                : "Invariant broken after parse: operators=" + operators.size()
+                + " segments=" + segments.size();
+
+        LOGGER.fine(() -> "Parse complete: " + segments.size()
+                + " segment(s), " + operators.size() + " operator(s)");
+
         return new ParsedPlan(segments, operators);
     }
 
@@ -243,15 +286,21 @@ public class ShellParser {
      * @return the segment
      */
     private Segment buildSegment(List<String> words, RedirectInfo redirect) {
+        assert words != null && !words.isEmpty()
+            : "buildSegmend() requires a non-empty word list";
+
         String commandName = words.get(0);
         String[] args = new String[words.size()-1];
         for(int i = 1; i < words.size(); i++) {
             args[i-1] = words.get(i);
         }
+
         return new Segment(commandName, args, redirect);
     }
 
-    private void flushCurrentToken(StringBuilder current, List<Token> tokens) {
+    private void flushCurrentToken(StringBuilder current, List<Token> tokens) throws IllegalArgumentException {
+        assert current != null : "current StringBuilder must not be null";
+        assert tokens != null : "tokens list must not be null";
         if (!current.isEmpty()){
             tokens.add(new Token(current.toString(), TokenType.WORD));
             current.setLength(0);
