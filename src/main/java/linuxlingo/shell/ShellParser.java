@@ -41,6 +41,7 @@ public class ShellParser {
 
         @Override
         public String toString() {
+
             return type + ":" + value;
         }
     }
@@ -96,36 +97,76 @@ public class ShellParser {
         List<Segment> segments = new java.util.ArrayList<>();
         List<TokenType> operators = new java.util.ArrayList<>();
 
+        // Edge case
         if (input == null || input.trim().isEmpty()) {
             return new ParsedPlan(segments, operators);
         }
 
-        String trimmed = input.trim();
+        // Tokenizer (char-by-char state machine)
+        List<Token> tokens = new java.util.ArrayList<>();
 
-        if (trimmed.contains(" | ")) {
-            String[] pipeParts = trimmed.split(" \\| ");
-            for (int i = 0; i < pipeParts.length; i++) {
-                segments.add(parseSegment(pipeParts[i].trim()));
-                if (i <pipeParts.length - 1) {
-                    operators.add(TokenType.PIPE);
+        enum State { NORMAL, IN_SINGLE_QUOTE, IN_DOUBLE_QUOTE}
+        State state = State.NORMAL;
+        StringBuilder current = new StringBuilder();
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+
+            switch(state) {
+            case NORMAL:
+                switch(c) {
+                case ' ', '\t':
+                    if (!current.isEmpty()) {
+                        tokens.add(new Token(current.toString(), TokenType.WORD));
+                        current.setLength(0);
+                    }
+
+                case '|':
+                    if (!current.isEmpty()) {
+                        tokens.add(new Token(current.toString(), TokenType.WORD));
+                        current.setLength(0);
+                    }
+                    tokens.add(new Token("|", TokenType.PIPE));
+                case ';':
+                    if (!current.isEmpty()) {
+                        tokens.add(new Token(current.toString(), TokenType.WORD));
+                        current.setLength(0);
+                    }
+                    tokens.add(new Token(";", TokenType.SEMICOLON));
+                case '&':
+                    if (i + 1 < input.length() && input.charAt(i + 1) == '&') {
+                        if (!current.isEmpty()) {
+                            tokens.add(new Token(current.toString(), TokenType.WORD));
+                            current.setLength(0);
+                        }
+                        tokens.add(new Token("&&", TokenType.AND));
+                        i++; // to skip the second '&'
+                    } else {
+                        current.append(c); // treat lone '&' symbol as an ordinary char
+                    }
+                case '>':
+                    if (!current.isEmpty()) {
+                        tokens.add(new Token(current.toString(), TokenType.WORD));
+                        current.setLength(0);
+                    }
+                    if (i + 1 < input.length() && input.charAt(i + 1) == '>') {
+                        tokens.add(new Token(">>", TokenType.APPEND));
+                        i++; // to skip the second '>'
+                    } else {
+                        tokens.add(new Token(">", TokenType.REDIRECT));
+                    }
+                case '\'':
+                    state = State.IN_SINGLE_QUOTE; // do not add quote to current
+                case '"':
+                    state = State.IN_DOUBLE_QUOTE; // do not add quote to current
+                default:
+                    current.append(c);
                 }
             }
-            return new ParsedPlan(segments, operators);
+
         }
 
-        if (trimmed.contains( " && ")) {
-            String[] andParts = trimmed.split(" && ");
-            for (int i = 0; i < andParts.length; i++) {
-                segments.add(parseSegment(andParts[i].trim()));
-                if (i < andParts.length - 1) {
-                    operators.add(TokenType.AND);
-                }
-            }
-            return new ParsedPlan(segments, operators);
-        }
-
-        segments.add(parseSegment(trimmed));
-        return new ParsedPlan(segments, operators);
+        return null;
     }
 
     private Segment parseSegment(String segmentStr) {
