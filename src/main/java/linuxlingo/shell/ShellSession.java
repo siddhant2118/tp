@@ -71,7 +71,8 @@ public class ShellSession {
     private final Ui ui;
     private boolean running;
     private final Map<String, String> aliases;
-    private ShellLineReader lineReader;
+    // v2.0: will be ShellLineReader once Owner B implements it
+    private Object lineReader;
     private final List<String> commandHistory;
 
     public ShellSession(VirtualFileSystem vfs, Ui ui) {
@@ -414,11 +415,11 @@ public class ShellSession {
         return aliases;
     }
 
-    public ShellLineReader getLineReader() {
+    public Object getLineReader() {
         return lineReader;
     }
 
-    public void setLineReader(ShellLineReader reader) {
+    public void setLineReader(Object reader) {
         this.lineReader = reader;
     }
 
