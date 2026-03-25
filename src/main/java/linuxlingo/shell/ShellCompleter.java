@@ -9,6 +9,8 @@ import org.jline.reader.Completer;
 import org.jline.reader.LineReader;
 import org.jline.reader.ParsedLine;
 
+import linuxlingo.shell.vfs.FileNode;
+
 /**
  * JLine completer for the LinuxLingo shell.
  *
@@ -34,10 +36,12 @@ public class ShellCompleter implements Completer {
 
     @Override
     public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
-        // [v2.0 STUB] TODO: Implement JLine tab-completion integration.
-        // Parse the line buffer up to the cursor position.
-        // If completing the first word, delegate to completeCommandName().
-        // Otherwise, delegate to completePath() for VFS path completion.
+        String currentWord = line.word() == null ? "" : line.word();
+        if (line.wordIndex() == 0) {
+            completeCommandName(currentWord, candidates);
+        } else {
+            completePath(currentWord, candidates);
+        }
     }
 
     /**
@@ -47,8 +51,9 @@ public class ShellCompleter implements Completer {
      * @param candidates the candidate list to populate
      */
     void completeCommandName(String prefix, List<Candidate> candidates) {
-        // [v2.0 STUB] TODO: Iterate over registry command names and alias names.
-        // Add a JLine Candidate for each name that starts with the given prefix.
+        for (String name : getCommandCompletions(prefix)) {
+            candidates.add(new Candidate(name));
+        }
     }
 
     /**
@@ -58,11 +63,9 @@ public class ShellCompleter implements Completer {
      * @param candidates the candidate list to populate
      */
     void completePath(String partial, List<Candidate> candidates) {
-        // [v2.0 STUB] TODO: Implement VFS path tab-completion.
-        // Split partial into directory part and name prefix.
-        // Resolve the directory in the VFS.
-        // Add a Candidate for each child whose name starts with the prefix.
-        // Append '/' suffix for directory children.
+        for (String path : getPathCompletions(partial)) {
+            candidates.add(new Candidate(path));
+        }
     }
 
     /**
@@ -73,8 +76,22 @@ public class ShellCompleter implements Completer {
      * @return sorted set of matching command names
      */
     public SortedSet<String> getCommandCompletions(String prefix) {
-        // [v2.0 STUB] TODO: Return a sorted set of command/alias names matching prefix.
-        return new TreeSet<>();
+        String normalizedPrefix = prefix == null ? "" : prefix;
+        SortedSet<String> completions = new TreeSet<>();
+
+        for (String commandName : session.getRegistry().getAllNames()) {
+            if (commandName.startsWith(normalizedPrefix)) {
+                completions.add(commandName);
+            }
+        }
+
+        for (String aliasName : session.getAliases().keySet()) {
+            if (aliasName.startsWith(normalizedPrefix)) {
+                completions.add(aliasName);
+            }
+        }
+
+        return completions;
     }
 
     /**
@@ -85,7 +102,53 @@ public class ShellCompleter implements Completer {
      * @return sorted set of matching paths
      */
     public SortedSet<String> getPathCompletions(String partial) {
-        // [v2.0 STUB] TODO: Return a sorted set of VFS paths matching the partial path.
-        return new TreeSet<>();
+        String normalizedPartial = partial == null ? "" : partial;
+        int lastSlash = normalizedPartial.lastIndexOf('/');
+
+        String directoryPart;
+        String namePrefix;
+        if (lastSlash < 0) {
+            directoryPart = ".";
+            namePrefix = normalizedPartial;
+        } else if (lastSlash == 0) {
+            directoryPart = "/";
+            namePrefix = normalizedPartial.substring(1);
+        } else {
+            directoryPart = normalizedPartial.substring(0, lastSlash);
+            namePrefix = normalizedPartial.substring(lastSlash + 1);
+        }
+
+        SortedSet<String> completions = new TreeSet<>();
+        try {
+            List<FileNode> children = session.getVfs().listDirectory(
+                    directoryPart, session.getWorkingDir(), true);
+            for (FileNode child : children) {
+                String childName = child.getName();
+                if (!childName.startsWith(namePrefix)) {
+                    continue;
+                }
+                if (!namePrefix.startsWith(".") && childName.startsWith(".")) {
+                    continue;
+                }
+
+                String candidateValue;
+                if (lastSlash < 0) {
+                    candidateValue = childName;
+                } else if (lastSlash == 0) {
+                    candidateValue = "/" + childName;
+                } else {
+                    candidateValue = directoryPart + "/" + childName;
+                }
+
+                if (child.isDirectory()) {
+                    candidateValue += "/";
+                }
+                completions.add(candidateValue);
+            }
+        } catch (RuntimeException e) {
+            return completions;
+        }
+
+        return completions;
     }
 }

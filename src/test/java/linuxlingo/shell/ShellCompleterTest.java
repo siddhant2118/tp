@@ -8,19 +8,13 @@ import org.jline.reader.Candidate;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import linuxlingo.shell.vfs.VirtualFileSystem;
 
 /**
- * Tests for ShellCompleter (stub verification).
- *
- * <h3>v2.0 (stub)</h3>
- * <p>All completion methods currently return empty collections.
- * Tests marked {@code @Disabled} document expected behaviour once
- * the completer is fully implemented.</p>
+ * Tests for ShellCompleter command and path completion behaviour.
  */
 public class ShellCompleterTest {
     private VirtualFileSystem vfs;
@@ -35,40 +29,39 @@ public class ShellCompleterTest {
         completer = new ShellCompleter(session);
     }
 
-    // ─── Stub verification ──────────────────────────────────────
+    // ─── Core behaviour ─────────────────────────────────────────
 
     @Test
-    public void getCommandCompletions_stub_returnsEmpty() {
-        SortedSet<String> results = completer.getCommandCompletions("");
+    public void getCommandCompletions_matchesByPrefix() {
+        SortedSet<String> results = completer.getCommandCompletions("gr");
         assertNotNull(results);
-        assertTrue(results.isEmpty());
+        assertTrue(results.contains("grep"));
     }
 
     @Test
-    public void getPathCompletions_stub_returnsEmpty() {
+    public void getPathCompletions_rootPrefix_matchesDirectory() {
         SortedSet<String> results = completer.getPathCompletions("/");
         assertNotNull(results);
-        assertTrue(results.isEmpty());
+        assertTrue(results.contains("/home/"));
     }
 
     @Test
-    public void completeCommandName_stub_noCandidates() {
+    public void completeCommandName_addsCandidates() {
         List<Candidate> candidates = new ArrayList<>();
         completer.completeCommandName("gr", candidates);
-        assertTrue(candidates.isEmpty());
+        assertTrue(candidates.stream().anyMatch(c -> c.value().equals("grep")));
     }
 
     @Test
-    public void completePath_stub_noCandidates() {
+    public void completePath_addsCandidates() {
         List<Candidate> candidates = new ArrayList<>();
-        completer.completePath("da", candidates);
-        assertTrue(candidates.isEmpty());
+        completer.completePath("/ho", candidates);
+        assertTrue(candidates.stream().anyMatch(c -> c.value().equals("/home/")));
     }
 
-    // ─── @Disabled: document expected full behaviour ────────────
+    // ─── Additional scenarios ────────────────────────────────────
 
     @Nested
-    @Disabled("v2.0 — command completion to be implemented")
     class CommandNameCompletion {
         @Test
         public void emptyPrefix_returnsAllCommands() {
@@ -85,7 +78,6 @@ public class ShellCompleterTest {
     }
 
     @Nested
-    @Disabled("v2.0 — path completion to be implemented")
     class PathCompletion {
         @Test
         public void absolutePath_rootChildren() {
@@ -102,7 +94,6 @@ public class ShellCompleterTest {
     }
 
     @Nested
-    @Disabled("v2.0 — candidate integration to be implemented")
     class CandidateIntegration {
         @Test
         public void completeCommandName_addsCandidates() {
