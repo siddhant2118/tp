@@ -22,14 +22,9 @@ import linuxlingo.shell.vfs.VfsException;
 public class LsCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // TODO [v2.0]: Add -R recursive listing support.
-        //  - Parse 'R' in the options loop and set a recursive flag.
-        //  - If recursive, call listRecursive(); otherwise call listDirectory().
-        //  - Currently falls through to v1.0 inline listing.
-
-        // ===== v1.0 implementation =====
         boolean longFormat = false;
         boolean showHidden = false;
+        boolean recursive = false;
         String targetPath = session.getWorkingDir();
         boolean hasExplicitPath = false;
 
@@ -41,6 +36,8 @@ public class LsCommand implements Command {
                         longFormat = true;
                     } else if (option == 'a') {
                         showHidden = true;
+                    } else if (option == 'R') {
+                        recursive = true;
                     } else {
                         return CommandResult.error("ls: invalid option -- " + option);
                     }
@@ -54,23 +51,16 @@ public class LsCommand implements Command {
         }
 
         try {
-            List<FileNode> children = session.getVfs().listDirectory(
-                    targetPath, session.getWorkingDir(), showHidden);
             List<String> lines = new ArrayList<>();
-            for (FileNode child : children) {
-                String name = child.getName() + (child.isDirectory() ? "/" : "");
-                if (!longFormat) {
-                    lines.add(name);
-                    continue;
-                }
-                int size = child.isDirectory() ? 0 : ((RegularFile) child).getSize();
-                lines.add(child.getPermission().toString() + "  " + size + "  " + name);
+            if (recursive) {
+                listRecursive(session, targetPath, longFormat, showHidden, lines);
+            } else {
+                listDirectory(session, targetPath, longFormat, showHidden, lines);
             }
             return CommandResult.success(String.join("\n", lines));
         } catch (VfsException e) {
             return CommandResult.error("ls: " + e.getMessage());
         }
-        // ===== end v1.0 =====
     }
 
     /**
@@ -86,10 +76,16 @@ public class LsCommand implements Command {
     private void listDirectory(ShellSession session, String path,
                                boolean longFormat, boolean showHidden,
                                List<String> lines) {
-        // TODO [v2.0]: List children of the given directory path.
-        //  - Use session.getVfs().listDirectory(path, session.getWorkingDir(), showHidden).
-        //  - Format each child as name (+ "/" if directory).
-        //  - If longFormat, prepend permission and size.
+        List<FileNode> children = session.getVfs().listDirectory(path, session.getWorkingDir(), showHidden);
+        for (FileNode child : children) {
+            String name = child.getName() + (child.isDirectory() ? "/" : "");
+            if (!longFormat) {
+                lines.add(name);
+                continue;
+            }
+            int size = child.isDirectory() ? 0 : ((RegularFile) child).getSize();
+            lines.add(child.getPermission().toString() + "  " + size + "  " + name);
+        }
     }
 
     /**
@@ -105,11 +101,31 @@ public class LsCommand implements Command {
     private void listRecursive(ShellSession session, String path,
                                boolean longFormat, boolean showHidden,
                                List<String> lines) {
-        // TODO [v2.0]: Recursively list directory contents.
-        //  - Print "absPath:" header for this directory.
-        //  - Call listDirectory-style logic for this directory.
-        //  - Collect subdirectories, then recurse into each with a blank
-        //    line separator.
+        String absolutePath = session.getVfs().getAbsolutePath(path, session.getWorkingDir());
+        lines.add(absolutePath + ":");
+
+        List<FileNode> children = session.getVfs().listDirectory(path, session.getWorkingDir(), showHidden);
+        List<String> childLines = new ArrayList<>();
+        List<String> subDirectories = new ArrayList<>();
+
+        for (FileNode child : children) {
+            String name = child.getName() + (child.isDirectory() ? "/" : "");
+            if (!longFormat) {
+                childLines.add(name);
+            } else {
+                int size = child.isDirectory() ? 0 : ((RegularFile) child).getSize();
+                childLines.add(child.getPermission().toString() + "  " + size + "  " + name);
+            }
+            if (child.isDirectory()) {
+                subDirectories.add(child.getAbsolutePath());
+            }
+        }
+
+        lines.addAll(childLines);
+        for (String subDirectoryPath : subDirectories) {
+            lines.add("");
+            listRecursive(session, subDirectoryPath, longFormat, showHidden, lines);
+        }
     }
 
     @Override

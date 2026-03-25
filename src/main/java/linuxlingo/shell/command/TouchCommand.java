@@ -12,26 +12,22 @@ import linuxlingo.shell.vfs.VfsException;
 public class TouchCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // ===== v1.0 implementation (single file) =====
         if (args.length == 0) {
             return CommandResult.error("touch: missing file operand");
         }
         try {
-            session.getVfs().createFile(args[0], session.getWorkingDir());
+            for (String arg : args) {
+                session.getVfs().createFile(arg, session.getWorkingDir());
+            }
             return CommandResult.success("");
         } catch (VfsException e) {
             return CommandResult.error("touch: " + e.getMessage());
         }
-        // ===== end v1.0 =====
-
-        // TODO [v2.0]: Support creating multiple files.
-        //  - Loop over all args and call createFile for each
-        //  - Update getUsage() to "touch <file> [file2...]"
     }
 
     @Override
     public String getUsage() {
-        return "touch <file>";
+        return "touch <file> [file2...]";
     }
 
     @Override

@@ -1,5 +1,8 @@
 package linuxlingo.shell.command;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 import linuxlingo.shell.vfs.VfsException;
@@ -12,39 +15,36 @@ import linuxlingo.shell.vfs.VfsException;
 public class MkdirCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // ===== v1.0 implementation (single directory) =====
         boolean parents = false;
-        String path = null;
+        List<String> paths = new ArrayList<>();
 
         for (String arg : args) {
             if (arg.equals("-p")) {
                 parents = true;
-            } else if (!arg.startsWith("-")) {
-                path = arg;
+            } else if (arg.startsWith("-")) {
+                return CommandResult.error("mkdir: invalid option -- " + arg);
+            } else {
+                paths.add(arg);
             }
         }
 
-        if (path == null) {
+        if (paths.isEmpty()) {
             return CommandResult.error("mkdir: missing operand");
         }
 
         try {
-            session.getVfs().createDirectory(path, session.getWorkingDir(), parents);
+            for (String path : paths) {
+                session.getVfs().createDirectory(path, session.getWorkingDir(), parents);
+            }
             return CommandResult.success("");
         } catch (VfsException e) {
             return CommandResult.error("mkdir: " + e.getMessage());
         }
-        // ===== end v1.0 =====
-
-        // TODO [v2.0]: Support creating multiple directories in a single invocation.
-        //  - Collect all non-flag args into a List<String> paths
-        //  - Loop over paths and call createDirectory for each
-        //  - Update getUsage() to "mkdir [-p] <path> [path2...]"
     }
 
     @Override
     public String getUsage() {
-        return "mkdir [-p] <path>";
+        return "mkdir [-p] <path> [path2...]";
     }
 
     @Override
