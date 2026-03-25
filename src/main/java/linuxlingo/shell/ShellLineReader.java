@@ -6,8 +6,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.History;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -52,9 +55,15 @@ public class ShellLineReader {
      * @return a new ShellLineReader
      */
     public static ShellLineReader create(ShellSession session) {
-        // [v2.0 STUB] TODO: Build a system terminal via TerminalBuilder.
-        // Fall back to createDumb() if IOException occurs.
-        return createDumb(session);
+        try {
+            Terminal terminal = TerminalBuilder.builder()
+                    .system(true)
+                    .build();
+            return buildReader(session, terminal);
+        } catch (IOException e) {
+            LOGGER.warning("Failed to create system terminal, using dumb terminal fallback");
+            return createDumb(session);
+        }
     }
 
     /**
@@ -96,10 +105,11 @@ public class ShellLineReader {
      * @return the line read, or {@code null} on EOF (Ctrl-D)
      */
     public String readLine(String prompt) {
-        // [v2.0 STUB] TODO: Use lineReader.readLine(prompt) with JLine.
-        // Handle UserInterruptException (Ctrl-C) and EndOfFileException (Ctrl-D)
-        // by returning null.
-        return null;
+        try {
+            return lineReader.readLine(prompt);
+        } catch (UserInterruptException | EndOfFileException e) {
+            return null;
+        }
     }
 
     /**
@@ -109,8 +119,11 @@ public class ShellLineReader {
      * @return list of history entries
      */
     public List<String> getHistory() {
-        // [v2.0 STUB] TODO: Iterate over history entries and return as unmodifiable list.
-        return Collections.unmodifiableList(new ArrayList<>());
+        List<String> entries = new ArrayList<>();
+        for (History.Entry entry : history) {
+            entries.add(entry.line());
+        }
+        return Collections.unmodifiableList(entries);
     }
 
     /**
@@ -119,8 +132,7 @@ public class ShellLineReader {
      * @return history size
      */
     public int getHistorySize() {
-        // [v2.0 STUB] TODO: Return the number of history entries.
-        return 0;
+        return history.size();
     }
 
     /**
@@ -129,7 +141,10 @@ public class ShellLineReader {
      * @param line the command line to add
      */
     public void addToHistory(String line) {
-        // [v2.0 STUB] TODO: Add the given line to the JLine history.
+        if (line == null) {
+            return;
+        }
+        history.add(line);
     }
 
     /**
@@ -145,6 +160,10 @@ public class ShellLineReader {
      * Close the terminal when done.
      */
     public void close() {
-        // [v2.0 STUB] TODO: Close the underlying terminal, handling IOException.
+        try {
+            terminal.close();
+        } catch (IOException e) {
+            LOGGER.warning("Failed to close terminal: " + e.getMessage());
+        }
     }
 }

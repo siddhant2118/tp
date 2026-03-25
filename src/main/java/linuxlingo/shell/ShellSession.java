@@ -118,9 +118,9 @@ public class ShellSession {
         ui.println("Welcome to LinuxLingo Shell! Type 'exit' to quit.");
 
         while (running) {
-            // v1.0: read from Ui
-            // TODO v2.0 (Owner B): if lineReader != null, use lineReader.readLine(getPrompt()) instead
-            String input = ui.readLine(getPrompt());
+            String input = lineReader != null
+                    ? lineReader.readLine(getPrompt())
+                    : ui.readLine(getPrompt());
 
             // null signals end of piped test input
             if (input == null) {
@@ -163,9 +163,16 @@ public class ShellSession {
      * - Close lineReader in finally block
      */
     public void startInteractive() {
-        // TODO v2.0: implement JLine integration
-        // Placeholder: just start with plain Ui for now
-        start();
+        ShellLineReader originalReader = lineReader;
+        try {
+            lineReader = ShellLineReader.create(this);
+            start();
+        } finally {
+            if (lineReader != null && lineReader != originalReader) {
+                lineReader.close();
+            }
+            lineReader = originalReader;
+        }
     }
 
     /**
