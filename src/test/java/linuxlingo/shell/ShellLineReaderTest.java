@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import linuxlingo.shell.vfs.VirtualFileSystem;
@@ -47,8 +46,6 @@ public class ShellLineReaderTest {
         reader.close();
     }
 
-    // v2.0 @Disabled — addToHistory() is a stub
-    @Disabled("v2.0 — addToHistory() to be implemented")
     @Test
     public void addToHistory_increasesSize() {
         ShellLineReader reader = ShellLineReader.createDumb(session);
@@ -58,8 +55,6 @@ public class ShellLineReaderTest {
         reader.close();
     }
 
-    // v2.0 @Disabled — addToHistory() is a stub
-    @Disabled("v2.0 — addToHistory() to be implemented")
     @Test
     public void getHistory_returnsChronologicalOrder() {
         ShellLineReader reader = ShellLineReader.createDumb(session);
@@ -75,8 +70,6 @@ public class ShellLineReaderTest {
         reader.close();
     }
 
-    // v2.0 @Disabled — addToHistory() is a stub
-    @Disabled("v2.0 — addToHistory() to be implemented")
     @Test
     public void history_duplicatesPreserved() {
         ShellLineReader reader = ShellLineReader.createDumb(session);
