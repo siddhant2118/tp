@@ -116,7 +116,7 @@ public class LsCommandTest {
     }
 
     @Test
-    public void ls_recursive_withA_showsHiddenFiles() {
+    public void ls_recursiveWithA_showsHiddenFiles() {
         vfs.createDirectory("/tmp/hidden-root", "/", false);
         vfs.createFile("/tmp/hidden-root/.secret", "/");
         vfs.createDirectory("/tmp/hidden-root/sub", "/", false);
