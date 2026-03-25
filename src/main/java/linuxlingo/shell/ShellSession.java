@@ -528,7 +528,8 @@ public class ShellSession {
         List<String> expanded = new ArrayList<>();
         for (String arg : args) {
             boolean hasWildcard = arg.contains("*") || arg.contains("?");
-            if (!hasWildcard) {
+            boolean hasPathSeparator = arg.contains("/");
+            if (!hasWildcard || !hasPathSeparator) {
                 expanded.add(arg);
                 continue;
             }
