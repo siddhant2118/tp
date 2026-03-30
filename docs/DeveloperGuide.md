@@ -608,7 +608,7 @@ before printing the error. This method computes the Levenshtein edit distance be
 the mistyped input and every registered command name, returning a "Did you mean 'X'?"
 hint if the closest match is within distance 2. Glob patterns in arguments (containing
 `*` or `?`) are expanded against the VFS via `expandGlobs()` before the command receives
-them — if no VFS paths match the pattern, the literal argument is passed through unchanged.
+them, if no VFS paths match the pattern, the literal argument is passed through unchanged.
 
 **Operator semantics:**
 

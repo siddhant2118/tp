@@ -2,6 +2,7 @@ package linuxlingo.shell;
 
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.ArrayList;
 
 /**
  * Transforms a raw input string into a structured execution plan.
@@ -46,13 +47,8 @@ public class ShellParser {
         public final TokenType type;
 
         public Token(String value, TokenType type) throws IllegalArgumentException {
-            if (value == null) {
-                throw new IllegalArgumentException("Token value must not be null");
-            }
-            if (type == null) {
-                throw new IllegalArgumentException("Token type must not be null");
-            }
-
+            Preconditions.requireNonNull(value, "Token.value");
+            Preconditions.requireNonNull(type, "Token.type");
             this.value = value;
             this.type = type;
         }
@@ -95,17 +91,20 @@ public class ShellParser {
         }
 
         public Segment(String commandName, String[] args, RedirectInfo redirect, String inputRedirect) {
-            if (commandName == null || commandName.isBlank()) {
-                throw new IllegalArgumentException("Segment commandName must not be null or blank");
-            }
-            if (args == null) {
-                throw new IllegalArgumentException("Segment args must not be null");
-            }
+            Preconditions.requireNonBlank(commandName, "Segment.commandName");
+            Preconditions.requireNonNull(args, "Segment.args");
 
             this.commandName = commandName;
             this.args = args;
             this.redirect = redirect;
             this.inputRedirect = inputRedirect;
+        }
+
+        @Override
+        public String toString() {
+            return commandName + " " + String.join(" ", args)
+                    + (redirect != null ? " " + (redirect.isAppend() ? ">>" : ">") + " " + redirect.target : "")
+                    + (inputRedirect != null ? " < " + inputRedirect : "");
         }
     }
 
@@ -114,12 +113,8 @@ public class ShellParser {
         public final List<TokenType> operators;
 
         public ParsedPlan(List<Segment> segments, List<TokenType> operators) {
-            if (segments == null) {
-                throw new IllegalArgumentException("ParsedPlan segments must not be null");
-            }
-            if (operators == null) {
-                throw new IllegalArgumentException("ParsedPLan operators must not be null");
-            }
+            Preconditions.requireNonNull(segments, "ParsedPlan.segments");
+            Preconditions.requireNonNull(operators, "ParsedPlan.operators");
 
             assert operators.size() == Math.max(0,segments.size() - 1)
                 : "operators.size()=" + operators.size()
@@ -127,6 +122,18 @@ public class ShellParser {
 
             this.segments = segments;
             this.operators = operators;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < segments.size(); i++) {
+                sb.append(segments.get(i));
+                if (i < operators.size()) {
+                    sb.append(" [").append(operators.get(i)).append("]");
+                }
+            }
+            return sb.toString();
         }
     }
 
@@ -142,19 +149,53 @@ public class ShellParser {
      * </ol>
      */
     public ParsedPlan parse(String input) throws IllegalArgumentException {
-        List<Segment> segments = new java.util.ArrayList<>();
-        List<TokenType> operators = new java.util.ArrayList<>();
 
         // Edge case
         if (input == null || input.trim().isEmpty()) {
             LOGGER.fine("parse() called with null or blank input - returning empty plan");
-            return new ParsedPlan(segments, operators);
+            return new ParsedPlan(new ArrayList<>(), new ArrayList<>());
+        }
+        LOGGER.fine(() -> "Parsing input: " + input);
+        List<Token> tokens = tokenize(input);
+        return buildPlan(tokens);
+    }
+
+    private Segment buildSegment(List<String> words, RedirectInfo redirect) {
+        return buildSegment(words, redirect, null);
+    }
+
+    /**
+     * build a segment from an accumulated word list.
+     * @param words the accumulated word list
+     * @param redirect optional output redirect
+     * @param inputRedirect optional input redirect file
+     * @return the segment
+     */
+    private Segment buildSegment(List<String> words, RedirectInfo redirect, String inputRedirect) {
+        assert words != null && !words.isEmpty()
+            : "buildSegmend() requires a non-empty word list";
+
+        String commandName = words.get(0);
+        String[] args = new String[words.size()-1];
+        for(int i = 1; i < words.size(); i++) {
+            args[i-1] = words.get(i);
         }
 
-        LOGGER.fine(() -> "Parsing input: " + input);
+        return new Segment(commandName, args, redirect, inputRedirect);
+    }
 
+    private void flushCurrentToken(StringBuilder current, List<Token> tokens) throws IllegalArgumentException {
+        assert current != null : "current StringBuilder must not be null";
+        assert tokens != null : "tokens list must not be null";
+        if (!current.isEmpty()){
+            tokens.add(new Token(current.toString(), TokenType.WORD));
+            current.setLength(0);
+        }
+    }
+
+    private List<Token> tokenize(String input) {
         // Tokenizer (char-by-char state machine)
-        List<Token> tokens = new java.util.ArrayList<>();
+        List<Token> tokens = new ArrayList<>();
 
         enum State { NORMAL, IN_SINGLE_QUOTE, IN_DOUBLE_QUOTE}
         State state = State.NORMAL;
@@ -236,12 +277,19 @@ public class ShellParser {
 
         // Flushing any remaining token
         flushCurrentToken(current, tokens);
+        return tokens;
+    }
+
+    private ParsedPlan buildPlan(List<Token> tokens) {
+
+        List<Segment> segments = new ArrayList<>();
+        List<TokenType> operators = new ArrayList<>();
 
         // Splitting tokens into Segment objects
         // Traverse the token list accumulating WORDs into the current segment
         // On REDIRECT/APPEND: consume the next WORD as the redirect target
         // ON PIPE/AND/SEMICOLON: finalize the current segment, record operator
-        List<String> currentWords = new java.util.ArrayList<>();
+        List<String> currentWords = new ArrayList<>();
         RedirectInfo currentRedirect = null;
         String currentInputRedirect = null;
         boolean expectRedirectTarget = false;
@@ -291,7 +339,7 @@ public class ShellParser {
                 // Finalizing the current segment before recording the operator
                 if (!currentWords.isEmpty()) {
                     segments.add(buildSegment(currentWords, currentRedirect, currentInputRedirect));
-                    currentWords = new java.util.ArrayList<>();
+                    currentWords.clear();
                     currentRedirect = null;
                     currentInputRedirect = null;
                 }
@@ -311,42 +359,9 @@ public class ShellParser {
                 : "Invariant broken after parse: operators=" + operators.size()
                 + " segments=" + segments.size();
 
-        LOGGER.fine(() -> "Parse complete: " + segments.size()
-                + " segment(s), " + operators.size() + " operator(s)");
+        LOGGER.fine(() -> "Parse complete: " + new ParsedPlan(segments, operators));
 
         return new ParsedPlan(segments, operators);
     }
-
-    private Segment buildSegment(List<String> words, RedirectInfo redirect) {
-        return buildSegment(words, redirect, null);
-    }
-
-    /**
-     * build a segment from an accumulated word list.
-     * @param words the accumulated word list
-     * @param redirect optional output redirect
-     * @param inputRedirect optional input redirect file
-     * @return the segment
-     */
-    private Segment buildSegment(List<String> words, RedirectInfo redirect, String inputRedirect) {
-        assert words != null && !words.isEmpty()
-            : "buildSegmend() requires a non-empty word list";
-
-        String commandName = words.get(0);
-        String[] args = new String[words.size()-1];
-        for(int i = 1; i < words.size(); i++) {
-            args[i-1] = words.get(i);
-        }
-
-        return new Segment(commandName, args, redirect, inputRedirect);
-    }
-
-    private void flushCurrentToken(StringBuilder current, List<Token> tokens) throws IllegalArgumentException {
-        assert current != null : "current StringBuilder must not be null";
-        assert tokens != null : "tokens list must not be null";
-        if (!current.isEmpty()){
-            tokens.add(new Token(current.toString(), TokenType.WORD));
-            current.setLength(0);
-        }
-    }
 }
+
