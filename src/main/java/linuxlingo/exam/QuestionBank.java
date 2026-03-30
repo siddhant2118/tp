@@ -115,17 +115,23 @@ public class QuestionBank {
         return topics.containsKey(topic);
     }
 
+    /** Internal helper to return a flattened list of all questions across topics. */
+    private List<Question> allQuestions() {
+        List<Question> all = new ArrayList<>();
+        for (List<Question> questions : topics.values()) {
+            all.addAll(questions);
+        }
+        return all;
+    }
+
     /**
      * Return one random question from all topics, or null if none available.
      */
     public Question getRandomQuestion() {
-        List<Question> allQuestions = new ArrayList<>();
-        for (List<Question> questions : topics.values()) {
-            allQuestions.addAll(questions);
-        }
-        if (allQuestions.isEmpty()) {
+        List<Question> all = allQuestions();
+        if (all.isEmpty()) {
             return null;
         }
-        return allQuestions.get(new Random().nextInt(allQuestions.size()));
+        return all.get(new Random().nextInt(all.size()));
     }
 }
