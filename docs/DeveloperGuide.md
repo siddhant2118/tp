@@ -558,9 +558,10 @@ This section describes some noteworthy details on how certain features are imple
 
 ### Shell Parsing and Execution
 
-The shell parsing pipeline transforms raw user input into a structured execution plan.
+The shell parsing pipeline transforms the raw user input string like `echo hello | grep h > out.txt` into a structured execution plan (`ParsedPlan`) that the execution engine can act on. Understanding this pipeline is essential before working on any feature that involves parsing or command execution.
 
-**Parsing pipeline overview:**
+
+**Parsing Pipeline Overview: (High Level)**
 
 ```plantuml
 @startuml
@@ -569,7 +570,7 @@ start
 :Tokenize (char-by-char state machine);
 note right
   States: NORMAL, IN_SINGLE_QUOTE, IN_DOUBLE_QUOTE
-  Recognizes: |, >, >>, &&, ;
+  Recognizes: ||, >, >>, &&, ;
 end note
 :Split tokens into Segments;
 note right
@@ -581,24 +582,103 @@ end note
 stop
 @enduml
 ```
+The `ShellParser.parse()` method runs the input through two stages: **tokenization**, then **plan building**
+```plantuml
+@startuml
+hide footbox
+participant Caller
+participant ":ShellParser" as SP
 
-The tokenizer uses a character-by-character state machine with three states:
+Caller -> SP : parse(input)
+SP -> SP : tokenize(input)
+note right : Char-by-char state machine.\nProduces a flat list of Tokens.
+SP -> SP : buildPlan(tokens)
+note right : Groups tokens into Segments\nseparated by operators.
+SP --> Caller : ParsedPlan
+@enduml
+```
 
-1. **NORMAL** — accumulates characters into tokens. Whitespace flushes the current token. Special characters (`|`, `>`, `>>`, `&&`, `;`) produce operator tokens. Quote characters switch state.
-2. **IN_SINGLE_QUOTE** — all characters are literal until the closing `'`.
-3. **IN_DOUBLE_QUOTE** — all characters are literal until the closing `"`.
+#### Stage 1: Tokenization
+The tokenizer reads the input one character at a time using a state machine with three states:
 
-After tokenization, the token list is split into `Segment` objects at inter-segment operators (`PIPE`, `AND`, `SEMICOLON`). Within each segment, `REDIRECT` / `APPEND` tokens consume the next `WORD` token as the redirect target file.
+| State | Behaviour                                                                                                                                                                                     |
+|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NORMAL` | Accumulates characters into tokens; whitespace flushes the current token.<br/> Special characters (` \| `, `>`, `>>`, `&&`, `;`) produce operator tokens. <br/>Quote characters switch state. |
+| `IN_SINGLE_QUOTE` | All characters are literal until the closing `'`                                                                                                                                              |
+| `IN_DOUBLE_QUOTE` | All characters are literal until the closing `"`                                                                                                                                              |
 
-The parser also handles two lookahead cases during tokenization: `||` and `>>` are
+After tokenization, the token list is split into `Segment` objects at inter-segment operators (`PIPE`, `AND`, `SEMICOLON` , `OR`). 
+Within each segment, `REDIRECT` / `APPEND` tokens consume the next `WORD` token as the redirect target file.
+
+The parser handles two lookahead cases during tokenization in `NORMAL` state: `||` and `>>` are
 distinguished from `|` and `>` by peeking at the next character before emitting a token.
+
 A lone `&` character (not followed by another `&`) is treated as a literal word character
-rather than an operator, matching standard shell behaviour. The `Expecting` state tracks
-whether the next WORD token should be consumed as a redirect target (for `>` / `>>`) or
-as an input redirect source (for `<`), and resets silently on malformed input such as
-a missing filename after a redirect operator.
+rather than an operator, which matches standard shell behaviour.
+
+#### Stage 2: Plan Building
+Once the flat token list is produced, `buildPlan()` walks through it and groups tokens into `Segment` objects. Each `Segment` holds a command name, its arguments, and optional redirect information. Operator tokens (`PIPE`, `AND`, `SEMICOLON`, `OR`) act as delimiters between segments and are recorded separately in the `operators` list.
+
+The parser maintains an `Expecting` flag to handle redirect targets: when a `REDIRECT` or `APPEND` token is seen, the very next `WORD` token is consumed as the redirect file path rather than as a command argument. The same pattern applies to `INPUT_REDIRECT` (`<`).
+
+The result is a `ParsedPlan` with the following invariant, enforced by an assertion:
+
+> `operators.size()` is always exactly `segments.size() - 1`
+
+This means a plan with three segments always has exactly two operators connecting them, making the execution engine's iteration straightforward.
 
 **Execution engine (`ShellSession.runPlan()`):**
+
+All parsing ultimately feeds into `runPlan()`, the core method that iterates the `ParsedPlan` and chains commands together. It is worth understanding its structure because most enhancements to the shell (new operators, alias resolution, input redirect) are implemented here.
+
+The engine tracks two pieces of state across iterations: `pipedStdin` (the stdout of the previous command, forwarded when the operator was `PIPE`) and `lastExitCode` (used to evaluate `&&` and `||` conditions). The loop processes one `Segment` per iteration:
+```plantuml
+@startuml
+hide footbox
+participant ":ShellSession" as SS
+participant ":CommandRegistry" as CR
+participant ":Command" as CMD
+participant ":VirtualFileSystem" as VFS
+participant ":UI" as UI
+
+loop for each Segment in ParsedPlan
+
+  SS -> SS : check preceding operator
+  note right
+    skip if && failed or || passed
+  end note
+
+  SS -> CR : get(commandName)
+
+  alt command found
+    SS -> CMD : execute(session, args, stdin)
+    CMD --> SS : CommandResult
+
+    alt segment has redirect
+      SS -> VFS : writeFile(target, stdout, append)
+      note right
+        stdout consumed by redirect
+      end note
+    end
+
+    note right
+      if next operator is PIPE →
+        forward stdout as stdin
+    end note
+
+  else command not found
+    SS -> SS : suggestCommand(commandName)
+    SS -> UI : println(error + suggestion)
+  end
+
+end
+@enduml
+```
+**Note: stdout consumed by a redirect is not forwarded to the next pipe stage**. <!--(This only applies when redirect is in the same segment)-->
+
+After a redirect, the result is replaced with an empty success, so a command like `echo hello > file | grep h` would give `grep` an empty stdin. This matches standard shell behaviour.
+
+The `shouldExit()` flag on `CommandResult` allows commands like `exit` to signal the REPL to stop, which `runPlan()` respects by setting `running = false` and breaking the loop immediately.
 
 The following sequence diagram shows how `echo hello | grep h > output.txt` is executed:
 
@@ -631,12 +711,12 @@ SS -> VFS : writeFile("output.txt", workingDir, "hello", false)
 @enduml
 ```
 
-When a command name is not found in the registry, `runPlan()` calls `suggestCommand()`
+<!-- When a command name is not found in the registry, `runPlan()` calls `suggestCommand()`
 before printing the error. This method computes the Levenshtein edit distance between
 the mistyped input and every registered command name, returning a "Did you mean 'X'?"
 hint if the closest match is within distance 2. Glob patterns in arguments (containing
 `*` or `?`) are expanded against the VFS via `expandGlobs()` before the command receives
-them, if no VFS paths match the pattern, the literal argument is passed through unchanged.
+them, if no VFS paths match the pattern, the literal argument is passed through unchanged. -->
 
 **Operator semantics:**
 
