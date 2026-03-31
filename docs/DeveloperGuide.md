@@ -328,20 +328,45 @@ class FitbQuestion extends Question {
 
 class PracQuestion extends Question {
     - checkpoints : List<Checkpoint>
-    + checkVfs(vfs) : boolean
+    - setupItems : List<SetupItem>
+    + checkVfs(vfs : VirtualFileSystem) : boolean
+    + applySetup(vfs : VirtualFileSystem) : void
+    + hasSetup() : boolean
+}
+
+class "PracQuestion.SetupItem" as SetupItem {
+    - type : SetupType
+    - path : String
+    - value : String
+}
+
+enum "PracQuestion.SetupItem.SetupType" as SetupType {
+    MKDIR
+    FILE
+    PERM
 }
 
 class Checkpoint {
     - path : String
     - expectedType : NodeType
-    + matches(vfs) : boolean
+    - expectedContent : String
+    - expectedPermission : String
+    + matches(vfs : VirtualFileSystem) : boolean
+}
+
+enum "Checkpoint.NodeType" as NodeType {
+    DIR
+    FILE
+    NOT_EXISTS
+    CONTENT_EQUALS
+    PERM
 }
 
 class QuestionBank {
     - topics : Map<String, List<Question>>
-    + load(directory : Path)
+    + load(directory : Path) : void
     + getTopics() : List<String>
-    + getQuestions(...) : List<Question>
+    + getQuestions(topic, count, random) : List<Question>
     + getRandomQuestion() : Question
 }
 
@@ -349,15 +374,15 @@ class ExamSession {
     - questionBank : QuestionBank
     - ui : Ui
     - vfsFactory : Supplier<VirtualFileSystem>
-    + startInteractive()
-    + startWithArgs(topic, count, random)
-    + runOneRandom()
-    + listTopics()
+    + startInteractive() : void
+    + startWithArgs(topic, count, random) : void
+    + runOneRandom() : void
+    + listTopics() : void
 }
 
 class ExamResult {
     - results : List<QuestionResult>
-    + addResult(question, userAnswer, correct)
+    + addResult(question, userAnswer, correct) : void
     + getScore() : int
     + display() : String
 }
@@ -365,6 +390,9 @@ class ExamResult {
 Question --> QT
 Question --> QD
 PracQuestion --> "*" Checkpoint : verified by
+PracQuestion --> "*" SetupItem : uses
+Checkpoint --> NodeType
+SetupItem --> SetupType
 ExamSession --> QuestionBank : queries
 ExamSession --> ExamResult : accumulates
 ExamSession ..> ShellSession : creates temp\n(for PRAC)
