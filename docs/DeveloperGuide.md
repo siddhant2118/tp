@@ -328,20 +328,45 @@ class FitbQuestion extends Question {
 
 class PracQuestion extends Question {
     - checkpoints : List<Checkpoint>
-    + checkVfs(vfs) : boolean
+    - setupItems : List<SetupItem>
+    + checkVfs(vfs : VirtualFileSystem) : boolean
+    + applySetup(vfs : VirtualFileSystem) : void
+    + hasSetup() : boolean
+}
+
+class "PracQuestion.SetupItem" as SetupItem {
+    - type : SetupType
+    - path : String
+    - value : String
+}
+
+enum "PracQuestion.SetupItem.SetupType" as SetupType {
+    MKDIR
+    FILE
+    PERM
 }
 
 class Checkpoint {
     - path : String
     - expectedType : NodeType
-    + matches(vfs) : boolean
+    - expectedContent : String
+    - expectedPermission : String
+    + matches(vfs : VirtualFileSystem) : boolean
+}
+
+enum "Checkpoint.NodeType" as NodeType {
+    DIR
+    FILE
+    NOT_EXISTS
+    CONTENT_EQUALS
+    PERM
 }
 
 class QuestionBank {
     - topics : Map<String, List<Question>>
-    + load(directory : Path)
+    + load(directory : Path) : void
     + getTopics() : List<String>
-    + getQuestions(...) : List<Question>
+    + getQuestions(topic, count, random) : List<Question>
     + getRandomQuestion() : Question
 }
 
@@ -349,15 +374,15 @@ class ExamSession {
     - questionBank : QuestionBank
     - ui : Ui
     - vfsFactory : Supplier<VirtualFileSystem>
-    + startInteractive()
-    + startWithArgs(topic, count, random)
-    + runOneRandom()
-    + listTopics()
+    + startInteractive() : void
+    + startWithArgs(topic, count, random) : void
+    + runOneRandom() : void
+    + listTopics() : void
 }
 
 class ExamResult {
     - results : List<QuestionResult>
-    + addResult(question, userAnswer, correct)
+    + addResult(question, userAnswer, correct) : void
     + getScore() : int
     + display() : String
 }
@@ -365,6 +390,9 @@ class ExamResult {
 Question --> QT
 Question --> QD
 PracQuestion --> "*" Checkpoint : verified by
+PracQuestion --> "*" SetupItem : uses
+Checkpoint --> NodeType
+SetupItem --> SetupType
 ExamSession --> QuestionBank : queries
 ExamSession --> ExamResult : accumulates
 ExamSession ..> ShellSession : creates temp\n(for PRAC)
@@ -669,7 +697,7 @@ participant ":Storage" as S
 Save -> VS : serialize(vfs, workingDir)
 note right of VS
   Depth-first walk of VFS tree.
-  Emit: TYPE | PATH | PERMS [| CONTENT]
+  Emit: TYPE | PATH | PERMISSIONS | CONTENT
   Escape newlines, pipes, backslashes.
 end note
 VS --> Save : envFileContent : String
@@ -772,6 +800,152 @@ For practical questions, `ExamSession.handlePracQuestion()`:
 3. Calls `tempSession.start()` — the user types shell commands.
 4. When the user types `exit`, the temporary session ends.
 5. Calls `PracQuestion.checkVfs(tempVfs)` which verifies each `Checkpoint` (expected path + node type).
+
+---
+
+### Exam Component — Practical Questions
+
+This section documents a planned enhancement to the Exam component’s practical (`PRAC`) questions: configurable VFS setup and richer checkpoint validation. The goal is to support more realistic, multi-step shell scenarios while keeping the public Exam API stable for the rest of the system.
+
+The enhancement is implemented via two extensions:
+
+1. `PracQuestion.SetupItem` — declarative VFS setup instructions applied before the user starts typing commands.
+2. Extended `Checkpoint` semantics — new node checks (`NOT_EXISTS`, `CONTENT_EQUALS`, `PERM`) to validate more aspects of the final VFS state.
+
+These changes are internal to the exam module and transparent to callers such as `ExamSession` and `QuestionBank`.
+
+---
+
+#### 1. Class-Level Design
+
+At a high level, the flow for a `PRAC` question becomes:
+
+1. `ExamSession` creates a fresh `VirtualFileSystem` via `vfsFactory`.
+2. `ExamSession` asks the `PracQuestion` to apply any configured setup into that VFS.
+3. `ExamSession` starts a temporary `ShellSession` over the prepared VFS and lets the user perform the task.
+4. When the user exits the shell, `PracQuestion.checkVfs()` verifies all `Checkpoint`s against the final VFS state.
+
+The enhancement is implemented by extending the existing `PracQuestion` and `Checkpoint` classes; no new top-level types are introduced.
+
+**Key classes (Exam sub-package):**
+
+- `PracQuestion` (in `linuxlingo.exam.question`)
+  - Already represents a practical question, with:
+    - `List<Checkpoint> checkpoints`
+    - `List<SetupItem> setupItems`
+  - Enhancement: implement `applySetup(VirtualFileSystem vfs)` using `setupItems`.
+
+- `PracQuestion.SetupItem` (inner static class)
+  - Already declared with:
+    - `SetupType` enum: `MKDIR`, `FILE`, `PERM`
+    - Fields: `type`, `path`, `value`
+  - Enhancement: define concrete semantics for each `SetupType` and enforce them in `applySetup`.
+
+- `Checkpoint` (in `linuxlingo.exam`)
+  - Already exposes `matches(VirtualFileSystem vfs)` and `NodeType` enum.
+  - Enhancement: implement additional `NodeType`s:
+    - `NOT_EXISTS` — assert that a path is absent.
+    - `CONTENT_EQUALS` — assert file content equality.
+    - `PERM` — assert file/dir permissions.
+
+- `ExamSession` (in `linuxlingo.exam`)
+  - Already orchestrates `PRAC` questions via `handlePracQuestion(PracQuestion q)`.
+  - Enhancement: call `q.applySetup(tempVfs)` before starting the `ShellSession`.
+
+This keeps the public interface between modules unchanged: the CLI, Shell, and Storage components continue to treat the Exam module as a black box that exposes `ExamSession` and `QuestionBank` only.
+
+---
+
+#### 2. Class Diagram (PracQuestion V2)
+
+![ClassDiagramPracQuestion](imgs/ClassDiagramPracQuestion.png)
+
+---
+
+#### 3. Sequence Flow — PRAC Question with Setup
+
+![SequenceFlowPracQuestion](imgs/SequenceFlowPracQuestion.png)
+
+---
+
+#### 4. Activity Diagram — Applying Setup Items
+![ActivityDiagramPracQuestion.png](imgs/ActivityDiagramPracQuestion.png)
+
+---
+
+#### 5. Rationale and Alternatives
+
+**Why introduce `SetupItem`?**
+
+- Many realistic shell exercises require a non-trivial starting state (pre-existing directories, files, permissions).
+- Encoding the initial environment directly in `VirtualFileSystem` from outside the exam module would tightly couple Exam to VFS internals.
+- `SetupItem` provides a small, declarative DSL for “what the environment should look like before the user starts”, which is:
+  - Easy to generate from question bank text via `QuestionParser`.
+  - Easy to reason about and test at the `PracQuestion` level.
+
+**Why extend `Checkpoint.NodeType`?**
+
+- Existing `DIR` and `FILE` checks only validate presence and node kind.
+- New types enable richer questions:
+  - `NOT_EXISTS`: “Remove this file/directory.”
+  - `CONTENT_EQUALS`: “Edit a file to contain specific content.”
+  - `PERM`: “Set the permission of this file to 755.”
+- This keeps the final-state validation declarative and human-readable in the question bank.
+
+**Alternative 1: Global VFS Templates**
+
+One alternative was to define named “VFS templates” elsewhere (e.g., serialized trees stored by the Storage component), and let `PracQuestion` refer to them by ID.
+
+- **Pros:**
+  - Reuse complex environments across multiple questions.
+  - Potentially faster to load via `VfsSerializer`.
+- **Cons:**
+  - Introduces a tight coupling between Exam and Storage/VFS serialization.
+  - Makes individual questions harder to understand without looking up the template definition.
+- **Reason rejected:** For this project scale, per-question declarative setup keeps the exam bank self-contained and easier for new contributors to maintain.
+
+**Alternative 2: Hard-coded Setup per Question**
+
+Another option was to provide a dedicated subclass or factory per practical question that mutates the VFS imperatively.
+
+- **Pros:**
+  - Maximum flexibility (any arbitrary VFS mutation is possible).
+- **Cons:**
+  - Scales poorly — new questions require new Java code.
+  - Blurs separation between content (questions) and logic (exam engine).
+- **Reason rejected:** Conflicts with the existing question-bank-driven design, where content lives in `.txt` files, not in code.
+
+---
+
+#### 6. Impact on Other Components
+
+- **CLI Component**
+  - No changes required. The `exam` command continues to delegate to `ExamSession`, which hides all internal PRAC details.
+
+- **Shell Component**
+  - No public API changes; `ShellSession` is still created with a `VirtualFileSystem` and `Ui`.
+  - Only observable difference is that the initial VFS contents for a `PRAC` question may now be non-empty.
+
+- **Storage Component**
+  - `QuestionParser` will parse additional fields for `PRAC` question setup, constructing the appropriate `SetupItem` instances.
+  - No changes are required in `Storage` itself.
+
+- **Testing**
+  - Unit tests can construct `PracQuestion` instances with explicit `setupItems` and `checkpoints`, then run:
+    - `applySetup(vfs)`
+    - mutate `vfs` as if a user had run commands
+    - assert on `checkVfs(vfs)` results
+  - This isolates exam logic from the interactive shell during automated testing.
+
+---
+
+#### 7. Extension Points
+
+This design leaves room for future growth:
+
+- **Additional `SetupType` values** (e.g., `COPY`, `MOVE`) can be added without modifying existing question banks.
+- **Additional `NodeType` values** can be introduced to validate more sophisticated conditions (e.g., ownership, timestamps).
+- A future version could allow **difficulty-based setup** (e.g., more complex initial states for `HARD` questions) by inspecting `difficulty` within `applySetup`.
 
 ---
 
