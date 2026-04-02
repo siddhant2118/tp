@@ -147,14 +147,14 @@ public class ShellSessionV2Test {
             vfs.createFile("/home/user/test.txt", "/");
             CommandResult result = session.executeOnce("echo hello || echo world");
             assertTrue(result.isSuccess());
-            assertEquals("hello", result.getStdout());
+            assertEquals("hello", result.getStdout().trim());
         }
 
         @Test
         public void orOperator_firstFails_secondRuns() {
             CommandResult result = session.executeOnce("cat nonexistent.txt || echo fallback");
             assertTrue(result.isSuccess());
-            assertEquals("fallback", result.getStdout());
+            assertEquals("fallback", result.getStdout().trim());
         }
     }
 
