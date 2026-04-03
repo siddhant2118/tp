@@ -602,7 +602,7 @@ user@linuxlingo:/$ ll
 > `alias ll='ls -la'` works correctly; `alias ll=ls -la` will only alias `ll` to `ls`,
 > silently ignoring `-la`.
 
-> [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts.
+> [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts. *(Coming soon: persistent aliases across sessions.)*
 
 > [Tip] **Tip:** Combined single-character flags like `-la` are automatically expanded to `-l -a` before the command runs, so both forms are accepted.
 
