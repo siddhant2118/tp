@@ -62,6 +62,7 @@ LinuxLingo is a **command-line application for learning Linux commands** through
 >   e.g. `touch FILE [FILE...]` can be used as `touch a.txt` or `touch a.txt b.txt c.txt`.
 > - Flags (e.g., `-r`, `-l`) can appear in any order before file arguments. Short flags can be combined (e.g., `-la` is equivalent to `-l -a`).
 > - Both single quotes (`'...'`) and double quotes (`"..."`) can be used to treat text as a single argument (e.g., `echo "hello world"`). Inside single quotes, all characters are treated literally (no variable or glob expansion).
+> - Outside of quotes, a backslash (`\`) escapes the next character, treating it as a literal. e.g. `echo hello\ world` passes `hello world` as a single argument.
 
 ### Main Menu Commands
 
@@ -597,8 +598,16 @@ user@linuxlingo:/$ alias ll='ls -la'
 user@linuxlingo:/$ ll
 ```
 
-> [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts.
+> [Note] **Note:** Quotes are required when the alias value contains spaces.
+> `alias ll='ls -la'` works correctly; `alias ll=ls -la` will only alias `ll` to `ls`,
+> silently ignoring `-la`.
 
+> [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts. *(Coming soon: persistent aliases across sessions.)*
+
+> [Tip] **Tip:** Combined single-character flags like `-la` are automatically expanded to `-l -a` before the command runs, so both forms are accepted.
+
+> [Tip] **Tip:** Aliases can chain, if `ll` is aliased to `ls -la` and `ls` is aliased to another command, LinuxLingo will follow the chain automatically. Circular aliases are detected and stopped safely.
+> 
 #### Removing aliases: `unalias`
 
 Removes one or more command aliases.
@@ -631,6 +640,9 @@ user@linuxlingo:/$ history
 ```
 
 ---
+> [Note] **Note:** Every command you enter is recorded in history, including commands that fail or produce errors. History resets when you leave the Shell Simulator.
+
+`history 0` shows no output (not an error). *(Coming soon: improved validation with an informative message for invalid counts.)*
 
 ### Environment Management Commands
 
