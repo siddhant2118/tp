@@ -852,39 +852,45 @@ Did you mean 'grep'?
 
 LinuxLingo includes a built-in exam system to test your knowledge of Linux commands. Questions are drawn from a question bank covering multiple topics.
 
-#### Interactive Exam
+![ExamModuleExample.png](imgs/ExamModuleExample.png)
 
-Start an interactive exam from the main menu.
+#### Starting an exam : `exam`
+
+Starts an interactive exam session where you choose the topic and number of questions.
 
 Format: `exam`
 
-1. A list of available topics is displayed (with question counts).
-2. You are prompted to select a topic by number or name.
-3. You are prompted for how many questions to attempt (press Enter for all).
-4. Questions are presented one at a time. After each answer, you receive immediate feedback (`[Correct]` or `[Incorrect]`) along with an explanation.
-5. At the end, your score is displayed (e.g., `Score: 7/10 (70%)`).
+- Prompts you to select a topic by number or name.
+- Prompts for the number of questions (press Enter for all questions in the topic).
+- Shows feedback ([Correct] / [Incorrect] and explanation) after each question.
+- Shows a final score summary at the end.
 
 > [Tip] **Tip:** Type `quit` to skip a question during an exam.
 
-#### Exam with CLI arguments
+#### Topic-Based Exam with CLI Arguments: `exam -t`
 
-You can start an exam directly with arguments for a faster workflow.
-
+Starts an exam for a specific topic, optionally with a limited number of questions and random order.
 Format: `exam -t TOPIC [-n COUNT] [-random]`
 
 - `-t TOPIC` -- specify the topic (e.g., `navigation`, `file-management`).
 - `-n COUNT` -- number of questions (default: all questions in the topic).
 - `-random` -- randomise question order.
+- If COUNT is greater than the number of questions in the topic, it will use all available questions.
 
 Example: `exam -t text-processing -n 5 -random`
+Starts a 5-question exam from the `text-processing` topic with questions in random order.
 
-#### Random question
+#### Random question: `exam -random`
 
-Presents a single random question from any topic -- great for a quick knowledge check.
+Asks you a single random question drawn from any topic.
 
 Format: `exam -random`
 
-#### Listing topics
+- Useful for quick knowledge check
+- The question type can be MCQ, FITB, or PRAC.
+- Shows immediate feedback and explanation, then returns you to the main menu.
+
+#### Listing topics: `exam -topics`
 
 Shows all available exam topics and how many questions each contains.
 
