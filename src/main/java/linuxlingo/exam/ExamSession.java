@@ -265,6 +265,8 @@ public class ExamSession {
         ShellSession tempSession = new ShellSession(tempVfs, ui);
         tempSession.start();
 
+        ui.println(">> Exiting Shell Simulator...");
+
         boolean correct = q.checkVfs(tempVfs);
         if (correct) {
             ui.println("✓ Correct!");
