@@ -175,13 +175,15 @@ public class ExamSession {
         ExamResult result = new ExamResult();
         for (int i = 0; i < questions.size(); i++) {
             Question q = Objects.requireNonNull(questions.get(i), "question must not be null");
+            int index = i + 1;
+            int total = questions.size();
 
             if (q instanceof PracQuestion pq) {
+                ui.println("[Q" + index + "/" + total + "] " + q.present());
                 boolean correct = handlePracQuestion(pq);
                 result.addResult(q, "", correct);
             } else {
-                int index = i + 1;
-                presentNonPracQuestion(q, index, questions.size(), result);
+                presentNonPracQuestion(q, index, total, result);
             }
         }
         return result;
@@ -254,7 +256,7 @@ public class ExamSession {
     private boolean handlePracQuestion(PracQuestion q) {
         Objects.requireNonNull(q, "prac question must not be null");
         ui.println(">> Entering Shell Simulator...");
-        ui.println("   Complete the task and type 'done' when finished.\n");
+        ui.println("   Complete the task and type 'exit' when finished.\n");
 
         VirtualFileSystem tempVfs = vfsFactory.get();
         if (tempVfs == null) {
