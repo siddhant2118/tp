@@ -172,8 +172,8 @@ public class QuestionParser {
      * {@code "/path:TYPE,/path2:TYPE"} where TYPE is {@code DIR} or {@code FILE}.</p>
      *
      * <p><b>[v2.0]</b> Signature updated to accept {@code options} for setup items.
-     * Setup items are semicolon-separated in the options field.
-     * <b>TODO:</b> implement setup-item parsing via {@link #parseSetupItem(String)}.</p>
+     * Setup items are semicolon-separated in the options field and parsed via
+     * {@link #parseSetupItem(String)}. Invalid setup items are ignored.</p>
      */
     private static PracQuestion parsePrac(String questionText, String answer,
                                           String options, String explanation,
@@ -276,7 +276,7 @@ public class QuestionParser {
     /**
      * Find the colon that separates the path from the type in a checkpoint string.
      *
-     * <p><b>[v2.0 TODO]</b> Needed for correct parsing of paths containing colons.
+     * <p><b>[v2.0]</b> Needed for correct parsing of paths containing colons.
      * Finds the colon <em>after</em> the last {@code /} to avoid splitting
      * on colons within the path itself.</p>
      *
@@ -301,7 +301,7 @@ public class QuestionParser {
     /**
      * Parse a single setup-item string into a {@link SetupItem}.
      *
-     * <p><b>[v2.0 TODO]</b> Parse setup items of the form
+     * <p><b>[v2.0]</b> Parses setup items of the form
      * {@code TYPE:path[=value]} where TYPE is {@code MKDIR}, {@code FILE},
      * or {@code PERM}.</p>
      *
