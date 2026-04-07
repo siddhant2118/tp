@@ -66,12 +66,32 @@ public class ExamSession {
             return;
         }
 
+        String selectedTopic = promptForTopic(topics);
+        if (selectedTopic == null) {
+            return;
+        }
+
+        int total = questionBank.getQuestionCount(selectedTopic);
+        int count = promptForQuestionCount(total);
+
+        List<Question> questions = questionBank.getQuestions(selectedTopic, count, false);
+        ExamResult result = runExam(questions);
+        ui.println("\n" + result.display());
+    }
+
+    /**
+     * Prompt the user to choose a topic, either by number or by name.
+     *
+     * @param topics the list of available topics
+     * @return the selected topic name, or {@code null} if selection was invalid
+     */
+    private String promptForTopic(List<String> topics) {
         listTopics();
         String topicInput = ui.readLine("Select topic (number or name): ");
         if (topicInput == null) {
             LOGGER.fine("Topic selection input was null");
             ui.println("Invalid topic selection.");
-            return;
+            return null;
         }
 
         String selectedTopic = null;
@@ -90,10 +110,17 @@ public class ExamSession {
         if (selectedTopic == null) {
             LOGGER.log(Level.INFO, "Invalid interactive topic selection: {0}", trimmedTopicInput);
             ui.println("Invalid topic selection.");
-            return;
         }
+        return selectedTopic;
+    }
 
-        int total = questionBank.getQuestionCount(selectedTopic);
+    /**
+     * Prompt the user for how many questions to attempt, clamped to [1, total].
+     *
+     * @param total the maximum number of questions available
+     * @return the number of questions to attempt
+     */
+    private int promptForQuestionCount(int total) {
         String countInput = ui.readLine("How many questions? (1-" + total + ", default: all): ");
 
         int count;
@@ -108,10 +135,7 @@ public class ExamSession {
             count = total;
         }
 
-        count = Math.max(1, Math.min(count, total));
-        List<Question> questions = questionBank.getQuestions(selectedTopic, count, false);
-        ExamResult result = runExam(questions);
-        ui.println("\n" + result.display());
+        return Math.max(1, Math.min(count, total));
     }
 
     /**
