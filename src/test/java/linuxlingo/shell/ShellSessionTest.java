@@ -78,7 +78,8 @@ class ShellSessionTest {
     void executeOnce_andOperator_continuesOnSuccess() {
         ShellSession session = createSession("");
         CommandResult result = session.executeOnce("echo ok && echo second");
-        assertEquals("second\n", result.getStdout());
+        // Both segments' stdout should be accumulated (#136 fix)
+        assertEquals("ok\n\nsecond\n", result.getStdout());
     }
 
     @Test

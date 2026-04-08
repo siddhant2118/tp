@@ -96,7 +96,12 @@ public class LinuxLingo {
         }
 
         int cmdStart = 1;
-        if (args[1].equals("-e") && args.length >= 4) {
+        if (args[1].equals("-e")) {
+            if (args.length < 4) {
+                ui.println("exec -e: missing command after environment name");
+                ui.println("Usage: java -jar LinuxLingo.jar exec -e <env> <command>");
+                return;
+            }
             String envName = args[2];
             try {
                 var loaded = linuxlingo.storage.VfsSerializer.loadFromFile(envName);
@@ -121,9 +126,8 @@ public class LinuxLingo {
         if (!result.getStdout().isEmpty()) {
             ui.println(result.getStdout());
         }
-        if (!result.getStderr().isEmpty()) {
-            ui.printError(result.getStderr());
-        }
+        // stderr is already printed by runPlan() during execution,
+        // so we don't print it again here to avoid duplicate error messages (#137)
     }
 
     /**

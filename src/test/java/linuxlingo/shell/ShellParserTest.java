@@ -432,25 +432,15 @@ class ShellParserTest {
 
     @Test
     public void parse_trailingPipeLastSegmentMissingHandledGracefully() {
-        // "ls |" — trailing pipe violates the parser invariant (operators=1, segments=1)
-        // In assertions-enabled mode this triggers AssertionError; otherwise may succeed.
-        try {
-            ShellParser.ParsedPlan plan = parser.parse("ls |");
-            // If parse succeeds, operators and segments should satisfy: operators == segments-1
-            assertTrue(plan.segments.size() >= 0,
-                    "parse should return a valid plan or throw AssertionError for trailing pipe");
-        } catch (AssertionError e) {
-            // Expected: the parser invariant fires
-            assertTrue(e.getMessage() != null,
-                    "AssertionError should have a message");
-        }
+        // "ls |" — trailing pipe should be detected as a syntax error
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("ls |"),
+                "parse should throw IllegalArgumentException for trailing pipe");
     }
 
     @Test
     public void parse_redirectWithoutTarget_handledGracefully() {
-        // "echo hello >" — redirect with no target file
-        ShellParser.ParsedPlan plan = parser.parse("echo hello >");
-        // Should not throw; segment may have null redirect
-        assertEquals(1, plan.segments.size());
+        // "echo hello >" — redirect with no target file should be a syntax error
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("echo hello >"),
+                "parse should throw IllegalArgumentException for redirect without target");
     }
 }
