@@ -10,12 +10,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Generic file read/write utilities for persistent storage on the real file system.
+ * Provides generic file read/write utilities for persistent storage on the
+ * real (host) file system.
  *
- * <p>This is <b>infrastructure</b> — fully implemented, used by {@code VfsSerializer},
- * the exam module, and any other component that needs disk I/O.</p>
- *
- * <p>All methods are static. Errors are wrapped in {@link StorageException}.</p>
+ * <p>This is an infrastructure class — fully static, used by
+ * {@code VfsSerializer}, the exam module, and any other component that
+ * needs disk I/O. Errors are wrapped in {@link StorageException}.</p>
  */
 public class Storage {
 
@@ -25,11 +25,11 @@ public class Storage {
     // ─── Read ────────────────────────────────────────────────────
 
     /**
-     * Read the entire contents of a file as a single String.
+     * Reads the entire contents of a file as a single string.
      *
-     * @param path the file to read
-     * @return file contents
-     * @throws StorageException if the file cannot be read
+     * @param path the file to read.
+     * @return the file contents as a string.
+     * @throws StorageException if the file cannot be read.
      */
     public static String readFile(Path path) throws StorageException {
         try {
@@ -40,11 +40,11 @@ public class Storage {
     }
 
     /**
-     * Read all lines from a file.
+     * Reads all lines from a file.
      *
-     * @param path the file to read
-     * @return list of lines (without line terminators)
-     * @throws StorageException if the file cannot be read
+     * @param path the file to read.
+     * @return a list of lines without line terminators.
+     * @throws StorageException if the file cannot be read.
      */
     public static List<String> readLines(Path path) throws StorageException {
         try {
@@ -57,12 +57,12 @@ public class Storage {
     // ─── Write ───────────────────────────────────────────────────
 
     /**
-     * Write content to a file, creating parent directories if necessary.
+     * Writes content to a file, creating parent directories if necessary.
      * Overwrites any existing content.
      *
-     * @param path    the file to write
-     * @param content the content to write
-     * @throws StorageException if the file cannot be written
+     * @param path    the file to write.
+     * @param content the content to write.
+     * @throws StorageException if the file cannot be written.
      */
     public static void writeFile(Path path, String content) throws StorageException {
         try {
@@ -74,11 +74,11 @@ public class Storage {
     }
 
     /**
-     * Append content to a file, creating it if it does not exist.
+     * Appends content to a file, creating it if it does not exist.
      *
-     * @param path    the file to append to
-     * @param content the content to append
-     * @throws StorageException if the file cannot be written
+     * @param path    the file to append to.
+     * @param content the content to append.
+     * @throws StorageException if the file cannot be written.
      */
     public static void appendFile(Path path, String content) throws StorageException {
         try {
@@ -97,17 +97,20 @@ public class Storage {
     // ─── Query / Delete ──────────────────────────────────────────
 
     /**
-     * Check whether a path exists on disk.
+     * Checks whether a path exists on disk.
+     *
+     * @param path the path to check.
+     * @return {@code true} if the path exists.
      */
     public static boolean exists(Path path) {
         return Files.exists(path);
     }
 
     /**
-     * Delete a file if it exists.
+     * Deletes a file if it exists.
      *
-     * @param path the file to delete
-     * @return {@code true} if the file was deleted, {@code false} if it did not exist
+     * @param path the file to delete.
+     * @return {@code true} if the file was deleted, {@code false} if it did not exist.
      */
     public static boolean delete(Path path) {
         try {
@@ -118,11 +121,11 @@ public class Storage {
     }
 
     /**
-     * List files in a directory that end with a given extension.
+     * Lists files in a directory that end with a given extension.
      *
-     * @param dir       the directory to list
-     * @param extension file extension filter (e.g. {@code ".env"})
-     * @return list of matching file paths, or empty list if none / dir missing
+     * @param dir       the directory to list.
+     * @param extension file extension filter (e.g. {@code ".env"}).
+     * @return a list of matching file paths, or an empty list if none found or directory is missing.
      */
     public static List<Path> listFiles(Path dir, String extension) {
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
@@ -140,10 +143,10 @@ public class Storage {
     // ─── Directory ───────────────────────────────────────────────
 
     /**
-     * Create the directory (and any missing parents) if it does not already exist.
+     * Creates the directory (and any missing parents) if it does not already exist.
      *
-     * @param dir the directory to create
-     * @throws StorageException if the directory cannot be created
+     * @param dir the directory to create.
+     * @throws StorageException if the directory cannot be created.
      */
     public static void ensureDirectory(Path dir) throws StorageException {
         if (dir == null) {
@@ -159,18 +162,18 @@ public class Storage {
     // ─── Paths ───────────────────────────────────────────────────
 
     /**
-     * Return the application-level data directory ({@code data/}).
+     * Returns the application-level data directory ({@code data/}).
      */
     public static Path getDataDir() {
         return DATA_DIR;
     }
 
     /**
-     * Return a subdirectory under the data directory.
+     * Returns a subdirectory path under the data directory.
      * For example: {@code getDataSubDir("environments")} → {@code data/environments/}.
      *
-     * @param sub subdirectory name
-     * @return path to the subdirectory
+     * @param sub the subdirectory name.
+     * @return the path to the subdirectory.
      */
     public static Path getDataSubDir(String sub) {
         return DATA_DIR.resolve(sub);

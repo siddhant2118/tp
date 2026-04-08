@@ -43,17 +43,20 @@ import linuxlingo.shell.command.WhichCommand;
 import linuxlingo.shell.command.WhoamiCommand;
 
 /**
- * Registry that maps command name strings to {@link Command} instances.
+ * Maintains a registry that maps command name strings to {@link Command} instances.
  *
- * <p><b>Owner: B &amp; C — each member registers the commands they own.</b></p>
- *
- * <p>All commands are registered here so that ShellSession can look them up by name.
- * The constructor wires up every command. Additional commands can be registered
- * at runtime via {@link #register(String, Command)}.</p>
+ * <p>All built-in commands are registered during construction so that
+ * {@link linuxlingo.shell.ShellSession} can look them up by name.
+ * Additional commands may be registered at runtime via
+ * {@link #register(String, Command)}.</p>
  */
 public final class CommandRegistry {
+    /** Ordered mapping from command name to command implementation. */
     private final Map<String, Command> commands;
 
+    /**
+     * Constructs a new CommandRegistry with all built-in commands registered.
+     */
     public CommandRegistry() {
         commands = new LinkedHashMap<>();
 
@@ -107,20 +110,40 @@ public final class CommandRegistry {
         register("tee", new TeeCommand());
     }
 
+    /**
+     * Registers a command under the given name, overwriting any existing
+     * command with the same name.
+     *
+     * @param name the command name (e.g. {@code "ls"}).
+     * @param cmd  the command implementation.
+     */
     public void register(String name, Command cmd) {
         commands.put(name, cmd);
     }
 
+    /**
+     * Returns the command registered under the given name, or {@code null}
+     * if no such command exists.
+     *
+     * @param name the command name to look up.
+     * @return the command, or {@code null}.
+     */
     public Command get(String name) {
         return commands.get(name);
     }
 
+    /**
+     * Returns a sorted set of all registered command names.
+     */
     public Set<String> getAllNames() {
         return new TreeSet<>(commands.keySet());
     }
 
     /**
-     * Returns an ordered map of command-name → description for the help screen.
+     * Returns an ordered map of command-name to description strings,
+     * suitable for rendering a help screen.
+     *
+     * @return an ordered map of name → description entries.
      */
     public Map<String, String> getHelpText() {
         Map<String, String> help = new LinkedHashMap<>();

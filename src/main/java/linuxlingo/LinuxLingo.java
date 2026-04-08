@@ -13,10 +13,24 @@ import linuxlingo.storage.Storage;
 import linuxlingo.storage.StorageException;
 
 /**
- * Main entry point for LinuxLingo.
+ * Serves as the main entry point for the LinuxLingo application.
+ *
+ * <p>Supports two modes of operation:
+ * <ul>
+ *   <li><b>Interactive mode</b> (no arguments) — launches a REPL via {@link MainParser}.</li>
+ *   <li><b>One-shot mode</b> — dispatches a single {@code shell}, {@code exec},
+ *       or {@code exam} command from the command-line arguments.</li>
+ * </ul></p>
  */
 public class LinuxLingo {
 
+    /**
+     * Launches the LinuxLingo application.
+     * Extracts bundled resources, loads the question bank, initialises the
+     * VFS and sessions, then enters interactive or one-shot mode.
+     *
+     * @param args command-line arguments; empty for interactive mode.
+     */
     public static void main(String[] args) {
         Ui ui = new Ui();
 
@@ -50,6 +64,14 @@ public class LinuxLingo {
         }
     }
 
+    /**
+     * Dispatches a one-shot command based on the first command-line argument.
+     *
+     * @param args         the full command-line arguments.
+     * @param ui           the user interface.
+     * @param shellSession the shell session.
+     * @param examSession  the exam session.
+     */
     private static void handleOneShot(String[] args, Ui ui,
                                       ShellSession shellSession, ExamSession examSession) {
         switch (args[0]) {
@@ -63,6 +85,10 @@ public class LinuxLingo {
         }
     }
 
+    /**
+     * Handles the {@code exec} one-shot command, optionally loading
+     * a saved environment before executing the shell command.
+     */
     private static void handleExec(String[] args, Ui ui, ShellSession shellSession) {
         if (args.length < 2) {
             ui.println("exec: missing command");
@@ -100,6 +126,10 @@ public class LinuxLingo {
         }
     }
 
+    /**
+     * Handles the {@code exam} one-shot command by parsing flags
+     * and delegating to the appropriate {@link ExamSession} method.
+     */
     private static void handleExam(String[] args, ExamSession examSession) {
         String topic = null;
         int count = -1;

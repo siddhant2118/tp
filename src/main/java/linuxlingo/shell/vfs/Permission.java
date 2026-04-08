@@ -1,12 +1,25 @@
 package linuxlingo.shell.vfs;
 
 /**
- * Permission model for VFS nodes.
- * Represents Unix-like 9-character permission string (e.g., "rwxr-xr-x").
+ * Represents a Unix-like permission model for VFS nodes.
+ *
+ * <p>Permissions are stored as a 9-element boolean array corresponding to
+ * the standard {@code rwxrwxrwx} format (owner, group, others).
+ * Instances can be created from a symbolic string (e.g. {@code "rwxr-xr-x"}),
+ * an octal string (e.g. {@code "755"}), or by modifying an existing permission
+ * with symbolic expressions (e.g. {@code "u+x"}).</p>
  */
 public class Permission {
+    /** Nine permission bits: owner r/w/x, group r/w/x, others r/w/x. */
     private final boolean[] bits; // length 9
 
+    /**
+     * Constructs a permission from a 9-character symbolic string such as
+     * {@code "rwxr-xr-x"}.
+     *
+     * @param permString the 9-character permission string.
+     * @throws IllegalArgumentException if the string is not 9 characters.
+     */
     public Permission(String permString) {
         if (permString.length() != 9) {
             throw new IllegalArgumentException("Permission string must be 9 characters: " + permString);
@@ -30,10 +43,22 @@ public class Permission {
         }
     }
 
+    /**
+     * Constructs a permission by cloning the given bits array.
+     *
+     * @param bits the 9-element boolean array to clone.
+     */
     private Permission(boolean[] bits) {
         this.bits = bits.clone();
     }
 
+    /**
+     * Creates a permission from a 3-digit octal string such as {@code "755"}.
+     *
+     * @param octal the 3-digit octal permission string.
+     * @return a new {@code Permission} instance.
+     * @throws IllegalArgumentException if the string is not 3 valid octal digits.
+     */
     public static Permission fromOctal(String octal) {
         if (octal.length() != 3) {
             throw new IllegalArgumentException("Octal permission must be 3 digits: " + octal);
@@ -51,6 +76,14 @@ public class Permission {
         return new Permission(b);
     }
 
+    /**
+     * Creates a new permission by applying a symbolic modification expression
+     * (e.g. {@code "u+x"}, {@code "g-w"}, {@code "a=rwx"}) to an existing permission.
+     *
+     * @param symbolic the symbolic permission expression.
+     * @param current  the current permission to base modifications on.
+     * @return a new {@code Permission} with the modifications applied.
+     */
     public static Permission fromSymbolic(String symbolic, Permission current) {
         boolean[] b = current.bits.clone();
         // Parse e.g. "u+x", "g-w", "o+rw", "a+x", "u=rwx"
@@ -107,6 +140,9 @@ public class Permission {
     }
 
     // CHECKSTYLE.OFF: OverloadMethodsDeclarationOrder
+    /**
+     * Applies a single permission operation (+, -, or =) to the bits array.
+     */
     private static void applyPermissionOp(boolean[] b, char op,
             boolean user, boolean group, boolean others,
             boolean r, boolean w, boolean x) {
@@ -124,6 +160,7 @@ public class Permission {
         }
     }
 
+    /** Applies the '+' (add) operator to the specified permission bits. */
     private static void applyAdd(boolean[] b,
             boolean user, boolean group, boolean others,
             boolean r, boolean w, boolean x) {
@@ -162,6 +199,7 @@ public class Permission {
         }
     }
 
+    /** Applies the '-' (remove) operator to the specified permission bits. */
     private static void applyRemove(boolean[] b,
             boolean user, boolean group, boolean others,
             boolean r, boolean w, boolean x) {
@@ -200,6 +238,7 @@ public class Permission {
         }
     }
 
+    /** Applies the '=' (set) operator to the specified permission bits. */
     private static void applySet(boolean[] b,
             boolean user, boolean group, boolean others,
             boolean r, boolean w, boolean x) {
@@ -221,42 +260,54 @@ public class Permission {
     }
     // CHECKSTYLE.ON: OverloadMethodsDeclarationOrder
 
+    /** Returns {@code true} if the owner has read permission. */
     public boolean canOwnerRead() {
         return bits[0];
     }
 
+    /** Returns {@code true} if the owner has write permission. */
     public boolean canOwnerWrite() {
         return bits[1];
     }
 
+    /** Returns {@code true} if the owner has execute permission. */
     public boolean canOwnerExecute() {
         return bits[2];
     }
 
+    /** Returns {@code true} if the group has read permission. */
     public boolean canGroupRead() {
         return bits[3];
     }
 
+    /** Returns {@code true} if the group has write permission. */
     public boolean canGroupWrite() {
         return bits[4];
     }
 
+    /** Returns {@code true} if the group has execute permission. */
     public boolean canGroupExecute() {
         return bits[5];
     }
 
+    /** Returns {@code true} if others have read permission. */
     public boolean canOtherRead() {
         return bits[6];
     }
 
+    /** Returns {@code true} if others have write permission. */
     public boolean canOtherWrite() {
         return bits[7];
     }
 
+    /** Returns {@code true} if others have execute permission. */
     public boolean canOtherExecute() {
         return bits[8];
     }
 
+    /**
+     * Returns the 9-character symbolic representation (e.g. {@code "rwxr-xr-x"}).
+     */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(9);
@@ -272,6 +323,9 @@ public class Permission {
         return sb.toString();
     }
 
+    /**
+     * Returns the 3-digit octal representation (e.g. {@code "755"}).
+     */
     public String toOctal() {
         int owner = (bits[0] ? 4 : 0) + (bits[1] ? 2 : 0) + (bits[2] ? 1 : 0);
         int group = (bits[3] ? 4 : 0) + (bits[4] ? 2 : 0) + (bits[5] ? 1 : 0);
@@ -279,6 +333,11 @@ public class Permission {
         return "" + owner + group + other;
     }
 
+    /**
+     * Creates and returns a defensive copy of this permission.
+     *
+     * @return a new {@code Permission} with identical bits.
+     */
     public Permission copy() {
         return new Permission(bits);
     }

@@ -4,22 +4,38 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Facade for Virtual File System operations.
- * Provides path resolution, file/directory creation, deletion, copy, move, etc.
+ * Provides a facade for all virtual file system operations.
+ *
+ * <p>Supports path resolution, file and directory creation, deletion,
+ * copy, move, content read/write, permission checks, wildcard search,
+ * and deep-copy cloning. All paths are resolved relative to a given
+ * working directory or from the root ({@code "/"}).</p>
  */
 public class VirtualFileSystem {
+    /** Root directory of the virtual file system. */
     private final Directory root;
 
+    /**
+     * Constructs a new virtual file system with the default directory tree.
+     */
     public VirtualFileSystem() {
         this.root = createDefaultTree();
     }
 
+    /**
+     * Constructs a virtual file system using the supplied root directory.
+     *
+     * @param root the root directory to use.
+     */
     public VirtualFileSystem(Directory root) {
         this.root = root;
     }
 
     /**
-     * Create the default VFS tree structure.
+     * Creates the default VFS tree containing {@code /home/user},
+     * {@code /tmp}, and {@code /etc/hostname}.
+     *
+     * @return the newly created root directory.
      */
     public static Directory createDefaultTree() {
         Directory root = new Directory("", new Permission("rwxr-xr-x"));
@@ -37,8 +53,12 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Resolve a path string to a FileNode.
-     * @throws VfsException if path not found
+     * Resolves a path string to the corresponding {@link FileNode}.
+     *
+     * @param path       the absolute or relative path to resolve.
+     * @param workingDir the current working directory for relative paths.
+     * @return the resolved node.
+     * @throws VfsException if the path does not exist or a component is not a directory.
      */
     public FileNode resolve(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
@@ -57,7 +77,12 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Resolve the parent directory of a path.
+     * Resolves the parent directory of the given path.
+     *
+     * @param path       the path whose parent is to be resolved.
+     * @param workingDir the current working directory for relative paths.
+     * @return the parent directory, or {@code null} if the path points to root.
+     * @throws VfsException if a component in the path does not exist.
      */
     public Directory resolveParent(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
@@ -82,7 +107,11 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Get the basename (last component) of a path.
+     * Returns the basename (last component) of the given path.
+     *
+     * @param path       the path to extract the basename from.
+     * @param workingDir the current working directory for relative paths.
+     * @return the basename, or an empty string if the path is root.
      */
     public String getBaseName(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
@@ -92,6 +121,15 @@ public class VirtualFileSystem {
         return parts.get(parts.size() - 1);
     }
 
+    /**
+     * Creates a new regular file at the given path, or returns an existing one
+     * (similar to the Unix {@code touch} command).
+     *
+     * @param path       the path of the file to create.
+     * @param workingDir the current working directory for relative paths.
+     * @return the created or existing {@link RegularFile}.
+     * @throws VfsException if the path points to a directory or permission is denied.
+     */
     public RegularFile createFile(String path, String workingDir) {
         Directory parent = resolveParent(path, workingDir);
         if (parent == null) {
@@ -113,6 +151,17 @@ public class VirtualFileSystem {
         return file;
     }
 
+    /**
+     * Creates a directory at the given path.
+     * If {@code parents} is {@code true}, creates intermediate directories as needed
+     * (similar to {@code mkdir -p}).
+     *
+     * @param path       the path of the directory to create.
+     * @param workingDir the current working directory for relative paths.
+     * @param parents    whether to create parent directories recursively.
+     * @return the created or existing directory.
+     * @throws VfsException if the path conflicts with an existing file or permission is denied.
+     */
     public Directory createDirectory(String path, String workingDir, boolean parents) {
         if (parents) {
             return createDirectoryRecursive(path, workingDir);
@@ -140,6 +189,10 @@ public class VirtualFileSystem {
         return dir;
     }
 
+    /**
+     * Recursively creates directories along the given path,
+     * similar to {@code mkdir -p}.
+     */
     private Directory createDirectoryRecursive(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
         FileNode current = root;
@@ -163,6 +216,16 @@ public class VirtualFileSystem {
         return (Directory) current;
     }
 
+    /**
+     * Deletes the node at the given path.
+     *
+     * @param path       the path of the node to delete.
+     * @param workingDir the current working directory for relative paths.
+     * @param recursive  whether to recursively delete directories.
+     * @param force      whether to suppress errors for non-existent paths.
+     * @throws VfsException if the target is a directory and recursive is {@code false},
+     *                      or if the path does not exist and force is {@code false}.
+     */
     public void delete(String path, String workingDir, boolean recursive, boolean force) {
         List<String> parts = normalizePath(path, workingDir);
         if (parts.isEmpty()) {
@@ -186,6 +249,15 @@ public class VirtualFileSystem {
         }
     }
 
+    /**
+     * Copies a node from the source path to the destination path.
+     *
+     * @param srcPath    the path of the source node.
+     * @param destPath   the path of the destination.
+     * @param workingDir the current working directory for relative paths.
+     * @param recursive  whether to allow copying directories.
+     * @throws VfsException if the source is a directory and recursive is {@code false}.
+     */
     public void copy(String srcPath, String destPath, String workingDir, boolean recursive) {
         FileNode src = resolve(srcPath, workingDir);
         if (src.isDirectory() && !recursive) {
@@ -226,6 +298,14 @@ public class VirtualFileSystem {
         }
     }
 
+    /**
+     * Moves (or renames) a node from the source path to the destination path.
+     *
+     * @param srcPath    the path of the node to move.
+     * @param destPath   the target path or directory.
+     * @param workingDir the current working directory for relative paths.
+     * @throws VfsException if the root is moved or types conflict.
+     */
     public void move(String srcPath, String destPath, String workingDir) {
         FileNode src = resolve(srcPath, workingDir);
         List<String> srcParts = normalizePath(srcPath, workingDir);
@@ -267,6 +347,14 @@ public class VirtualFileSystem {
         }
     }
 
+    /**
+     * Reads and returns the text content of a regular file.
+     *
+     * @param path       the path of the file to read.
+     * @param workingDir the current working directory for relative paths.
+     * @return the file content.
+     * @throws VfsException if the path is a directory or read permission is denied.
+     */
     public String readFile(String path, String workingDir) {
         FileNode node = resolve(path, workingDir);
         if (node.isDirectory()) {
@@ -278,6 +366,15 @@ public class VirtualFileSystem {
         return ((RegularFile) node).getContent();
     }
 
+    /**
+     * Writes content to a regular file, creating it if it does not exist.
+     *
+     * @param path       the path of the file to write.
+     * @param workingDir the current working directory for relative paths.
+     * @param content    the content to write.
+     * @param append     whether to append to existing content instead of overwriting.
+     * @throws VfsException if the path is a directory or write permission is denied.
+     */
     public void writeFile(String path, String workingDir, String content, boolean append) {
         FileNode node;
         try {
@@ -300,6 +397,15 @@ public class VirtualFileSystem {
         }
     }
 
+    /**
+     * Lists the children of a directory, optionally including hidden entries.
+     *
+     * @param path       the path of the directory to list.
+     * @param workingDir the current working directory for relative paths.
+     * @param showHidden whether to include entries starting with {@code '.'}.
+     * @return a list of child nodes.
+     * @throws VfsException if the path is not a directory or read permission is denied.
+     */
     public List<FileNode> listDirectory(String path, String workingDir, boolean showHidden) {
         FileNode node = resolve(path, workingDir);
         if (!node.isDirectory()) {
@@ -317,16 +423,31 @@ public class VirtualFileSystem {
         return children;
     }
 
+    /**
+     * Returns the root directory of this virtual file system.
+     */
     public Directory getRoot() {
         return root;
     }
 
+    /**
+     * Creates and returns a deep copy of this entire virtual file system.
+     *
+     * @return a new {@code VirtualFileSystem} with a cloned directory tree.
+     */
     public VirtualFileSystem deepCopy() {
         return new VirtualFileSystem(root.deepCopy());
     }
 
     /**
-     * Find nodes by name pattern (supports * wildcard).
+     * Finds nodes whose names match the given wildcard pattern, searching
+     * recursively from the specified start path.
+     *
+     * @param startPath  the directory to start searching from.
+     * @param workingDir the current working directory for relative paths.
+     * @param pattern    the wildcard pattern (supports {@code *} and {@code ?}).
+     * @return a list of matching nodes.
+     * @throws VfsException if the start path is not a directory.
      */
     public List<FileNode> findByName(String startPath, String workingDir, String pattern) {
         FileNode start = resolve(startPath, workingDir);
@@ -338,6 +459,7 @@ public class VirtualFileSystem {
         return results;
     }
 
+    /** Recursively searches a directory tree for nodes matching the pattern. */
     private void findRecursive(Directory dir, String pattern, List<FileNode> results) {
         for (FileNode child : dir.getChildren()) {
             if (matchesWildcard(pattern, child.getName())) {
@@ -349,6 +471,14 @@ public class VirtualFileSystem {
         }
     }
 
+    /**
+     * Checks whether a name matches a wildcard pattern.
+     * Supports {@code *} (any sequence) and {@code ?} (single character).
+     *
+     * @param pattern the wildcard pattern.
+     * @param name    the name to test.
+     * @return {@code true} if the name matches the pattern.
+     */
     public static boolean matchesWildcard(String pattern, String name) {
         String regex = "";
         for (int i = 0; i < pattern.length(); i++) {
@@ -367,7 +497,11 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Check if a path exists.
+     * Checks whether a path exists in the virtual file system.
+     *
+     * @param path       the path to check.
+     * @param workingDir the current working directory for relative paths.
+     * @return {@code true} if the path resolves to an existing node.
      */
     public boolean exists(String path, String workingDir) {
         try {
@@ -379,7 +513,13 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Normalize a path string into a list of path components.
+     * Normalizes a path string into a list of resolved path components.
+     * Handles absolute paths, relative paths, {@code ~} expansion, and
+     * {@code .} / {@code ..} resolution.
+     *
+     * @param pathString the raw path string.
+     * @param workingDir the current working directory for relative paths.
+     * @return a list of normalised path component strings.
      */
     List<String> normalizePath(String pathString, String workingDir) {
         String[] rawParts;
@@ -410,7 +550,12 @@ public class VirtualFileSystem {
     }
 
     /**
-     * Get the absolute path for a given path string.
+     * Returns the absolute path for a given path string by normalising
+     * and joining its components.
+     *
+     * @param path       the raw path string.
+     * @param workingDir the current working directory for relative paths.
+     * @return the normalised absolute path (e.g. {@code "/home/user"}).
      */
     public String getAbsolutePath(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);

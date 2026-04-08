@@ -4,13 +4,23 @@ import linuxlingo.exam.ExamSession;
 import linuxlingo.shell.ShellSession;
 
 /**
- * Parse and dispatch top-level commands in interactive mode.
+ * Parses and dispatches top-level commands in the interactive REPL mode.
+ *
+ * <p>Recognised commands include {@code shell}, {@code exec}, {@code exam},
+ * {@code help}, and {@code exit}/{@code quit}.</p>
  */
 public class MainParser {
     private final Ui ui;
     private final ShellSession shellSession;
     private final ExamSession examSession;
 
+    /**
+     * Constructs a new MainParser wired to the given UI and sessions.
+     *
+     * @param ui          the user interface for reading input and printing output.
+     * @param shellSession the shell session used for shell and exec commands.
+     * @param examSession  the exam session used for the exam command.
+     */
     public MainParser(Ui ui, ShellSession shellSession, ExamSession examSession) {
         this.ui = ui;
         this.shellSession = shellSession;
@@ -18,7 +28,8 @@ public class MainParser {
     }
 
     /**
-     * Start the interactive REPL. Blocks until user types "exit".
+     * Starts the interactive REPL loop. Blocks until the user types
+     * {@code exit} or {@code quit}.
      */
     public void run() {
         ui.printWelcome();
@@ -38,7 +49,10 @@ public class MainParser {
     }
 
     /**
-     * @return false if the user wants to exit
+     * Parses a single input line and dispatches it to the appropriate handler.
+     *
+     * @param input the trimmed, non-empty user input.
+     * @return {@code false} if the user wants to exit, {@code true} otherwise.
      */
     private boolean parseAndExecute(String input) {
         String[] parts = input.split("\\s+");
@@ -71,6 +85,10 @@ public class MainParser {
         }
     }
 
+    /**
+     * Handles the {@code exec} command by extracting the shell command string,
+     * optionally loading a saved environment, and executing the command.
+     */
     private void handleExec(String input) {
         // Extract the command string after "exec"
         String rest = input.substring(4).trim();
@@ -114,6 +132,11 @@ public class MainParser {
         }
     }
 
+    /**
+     * Handles the {@code exam} command by parsing optional flags
+     * ({@code -t}, {@code -n}, {@code -random}, {@code -topics}) and
+     * delegating to the appropriate {@link ExamSession} method.
+     */
     private void handleExam(String[] parts) {
         if (parts.length == 1) {
             examSession.startInteractive();
@@ -159,6 +182,7 @@ public class MainParser {
         }
     }
 
+    /** Prints the list of available top-level commands to the UI. */
     private void printHelp() {
         ui.println("Available commands:");
         ui.println("  shell                        Enter the Shell Simulator");
