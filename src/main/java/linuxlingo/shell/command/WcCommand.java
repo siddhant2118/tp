@@ -12,8 +12,7 @@ import linuxlingo.shell.vfs.VfsException;
  * Syntax: wc [-l] [-w] [-c] &lt;file&gt;
  *
  * <p><b>v1.0</b>: Single file support with -l, -w, -c flags.</p>
- * <p><b>v2.0 [TODO]</b>: Support multiple files with a "total" summary line;
- * refactor via handleMultipleFiles() and formatWcLine().</p>
+ * <p><b>v2.0</b>: Supports multiple files with a {@code total} summary line.</p>
  *
  * <p><b>Owner: C</b></p>
  */
@@ -205,7 +204,7 @@ public class WcCommand implements Command {
 
     @Override
     public String getUsage() {
-        return "wc [-l] [-w] [-c] <file>";
+        return "wc [-l] [-w] [-c] [file ...]";
     }
 
     @Override

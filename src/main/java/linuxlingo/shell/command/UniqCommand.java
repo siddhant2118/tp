@@ -11,8 +11,8 @@ import linuxlingo.shell.vfs.VfsException;
  * Removes adjacent duplicate lines.
  * Syntax: uniq [-c] &lt;file&gt;
  *
- * <p><b>v1.0</b>: Remove adjacent duplicates with optional -c (count) flag.</p>
- * <p><b>v2.0 [TODO]</b>: Add -d flag to show only duplicate lines; refactor via addUniqResult().</p>
+ * <p><b>v1.0</b>: Remove adjacent duplicates with optional {@code -c} (count) flag.</p>
+ * <p><b>v2.0</b>: Adds {@code -d} to show only duplicated groups.</p>
  *
  * <p><b>Owner: C</b></p>
  */
@@ -75,7 +75,7 @@ public class UniqCommand implements Command {
     }
 
     /**
-     * [v2.0 STUB] Helper to add a uniq result line, respecting -c and -d flags.
+     * Adds a formatted uniq result line, respecting {@code -c} and {@code -d}.
      *
      * @param results          the output list to append to
      * @param line             the current unique line

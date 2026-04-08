@@ -6,22 +6,15 @@ import linuxlingo.shell.ShellSession;
 
 /**
  * Removes shell aliases.
- * Syntax: unalias &lt;name&gt; [-a]
+ * Syntax: {@code unalias <name> [name2 ...]} or {@code unalias -a}.
  *
- * <p><b>Owner: A — stub; to be implemented.</b></p>
- *
- * TODO: Member A should implement:
- * - Remove a named alias
- * - -a flag to clear all aliases
- * - Error for non-existent aliases
+ * <p>The {@code -a} flag removes all aliases. Otherwise, each provided alias
+ * name is removed and missing aliases are reported as errors.</p>
  */
 public class UnaliasCommand implements Command {
 
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // [v2.0 STUB] TODO: Implement unalias command.
-        // Remove a named alias, or use -a to clear all aliases.
-        // Return error for missing args or non-existent aliases.
         if (args.length == 0) {
             return CommandResult.error("unalias: usage: unalias name [name ...]");
         }

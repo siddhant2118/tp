@@ -10,14 +10,10 @@ import linuxlingo.shell.vfs.VfsException;
 
 /**
  * Displays a directory tree structure.
- * Syntax: tree [path]
+ * Syntax: {@code tree [path]}.
  *
- * <p><b>Owner: C — stub; to be implemented.</b></p>
- * <p>
- * TODO: Member C should implement:
- * - Recursive tree display with tree-drawing characters (├── └──)
- * - Count directories and files
- * - Default to working directory if no path given
+ * <p>Prints the hierarchy using tree-drawing characters and appends a
+ * summary count of discovered directories and files.</p>
  */
 public class TreeCommand implements Command {
 
@@ -45,6 +41,14 @@ public class TreeCommand implements Command {
         }
     }
 
+    /**
+     * Recursively walks a directory and appends formatted tree lines.
+     *
+     * @param dir current directory node
+     * @param prefix visual prefix for current indentation level
+     * @param sb output buffer
+     * @param counts index 0 = directory count, index 1 = file count
+     */
     private void buildTree(Directory dir, String prefix, StringBuilder sb, int[] counts) {
         List<FileNode> children = dir.getChildren();
 

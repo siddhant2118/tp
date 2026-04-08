@@ -6,24 +6,16 @@ import linuxlingo.shell.ShellSession;
 
 /**
  * Creates or displays shell aliases.
- * Syntax: alias [name=value]
+ * Syntax: {@code alias [name=value]}.
  *
- * <p><b>Owner: A — stub; to be implemented.</b></p>
- *
- * TODO: Member A should implement:
- * - No args: list all aliases
- * - name=value: set an alias
- * - name (without =): show specific alias
- * - Strip surrounding quotes from values
+ * <p>Supports three modes:
+ * list all aliases, print one alias by name, or define/update an alias using
+ * {@code name=value}. Single quotes around values are stripped.</p>
  */
 public class AliasCommand implements Command {
 
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // [v2.0 STUB] TODO: Implement alias command.
-        // No args: list all aliases.
-        // name=value: set an alias (strip surrounding quotes from value).
-        // name (without =): show that specific alias.
         if (args.length == 0) {
             return listAliases(session);
         }
@@ -37,8 +29,10 @@ public class AliasCommand implements Command {
     }
 
     /**
-     * Print all current aliases
-     * format for printing is name = 'value'
+     * Prints all aliases in shell-compatible syntax.
+     *
+     * @param session active shell session
+     * @return alias listing, or empty output when none exist
      */
     private CommandResult listAliases(ShellSession session) {
         Map<String, String > aliases = session.getAliases();
@@ -57,9 +51,11 @@ public class AliasCommand implements Command {
     }
 
     /**
-     * Parses name=value or name='value and stores them in the aliases map
+     * Parses an alias definition and stores it in session aliases.
+     *
+     * @param session active shell session
      * @param definition the raw alias definition argument
-     * @return
+     * @return success when stored, or an error for invalid definitions
      */
     private CommandResult setAlias(ShellSession session, String definition) {
         int eqIndex = definition.indexOf('=');
@@ -79,6 +75,12 @@ public class AliasCommand implements Command {
         return CommandResult.success("");
     }
 
+    /**
+     * Removes a single pair of surrounding single quotes from a value.
+     *
+     * @param s raw alias value
+     * @return unquoted value when quoted, else the original string
+     */
     private String stripSurroundingQuotes(String s) {
         if (s.length() >= 2 && s.charAt(0) == '\'' && s.charAt(s.length() - 1) == '\'') {
             return s.substring(1, s.length() - 1);
@@ -86,6 +88,13 @@ public class AliasCommand implements Command {
         return s;
     }
 
+    /**
+     * Prints a specific alias by name.
+     *
+     * @param session active shell session
+     * @param name alias key
+     * @return alias output or not-found error
+     */
     private CommandResult showAlias(ShellSession session, String name) {
         String value = session.getAliases().get(name);
         if (value == null) {

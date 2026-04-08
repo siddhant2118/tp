@@ -62,7 +62,6 @@ public class ChmodCommand implements Command {
 
     /**
      * Applies a permission mode to a single file node.
-     * <p><b>[v2.0 stub]</b></p>
      *
      * @param node    the target file node
      * @param mode    the permission mode string (octal or symbolic)
@@ -82,7 +81,6 @@ public class ChmodCommand implements Command {
 
     /**
      * Recursively applies a permission mode to a node and all its children.
-     * <p><b>[v2.0 stub]</b></p>
      *
      * @param node    the target file node (may be a directory)
      * @param mode    the permission mode string (octal or symbolic)

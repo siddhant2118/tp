@@ -53,15 +53,31 @@ public class VfsSerializer {
         private final VirtualFileSystem vfs;
         private final String workingDir;
 
+        /**
+         * Creates a deserialized snapshot wrapper.
+         *
+         * @param vfs reconstructed virtual file system
+         * @param workingDir working directory captured in the snapshot
+         */
         public DeserializedVfs(VirtualFileSystem vfs, String workingDir) {
             this.vfs = vfs;
             this.workingDir = workingDir;
         }
 
+        /**
+         * Returns the reconstructed virtual file system.
+         *
+         * @return deserialized VFS instance
+         */
         public VirtualFileSystem getVfs() {
             return vfs;
         }
 
+        /**
+         * Returns the persisted working directory.
+         *
+         * @return absolute working-directory path
+         */
         public String getWorkingDir() {
             return workingDir;
         }
@@ -302,6 +318,12 @@ public class VfsSerializer {
         return result.toString();
     }
 
+    /**
+     * Appends a node and its descendants to serialized output.
+     *
+     * @param node current VFS node
+     * @param sb output buffer for serialized lines
+     */
     private static void appendNode(FileNode node, StringBuilder sb) {
         if (node.isDirectory()) {
             sb.append("DIR  | ")
@@ -324,6 +346,12 @@ public class VfsSerializer {
                 .append("\n");
     }
 
+    /**
+     * Splits an absolute path into path segments.
+     *
+     * @param path absolute path to split
+     * @return path segments, excluding leading slash and root
+     */
     private static String[] splitAbsolutePath(String path) {
         if (path == null || path.isEmpty() || "/".equals(path)) {
             return new String[0];
@@ -332,6 +360,13 @@ public class VfsSerializer {
         return normalized.isEmpty() ? new String[0] : normalized.split("/");
     }
 
+    /**
+     * Ensures all parent directories for a path exist, creating missing ones.
+     *
+     * @param root snapshot root directory
+     * @param pathParts split path parts including leaf name
+     * @return parent directory of the leaf node
+     */
     private static Directory ensureParentDirectories(Directory root, String[] pathParts) {
         Directory current = root;
         for (int i = 0; i < pathParts.length - 1; i++) {

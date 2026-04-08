@@ -4,15 +4,11 @@ import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 
 /**
- * Shows the path of a command (whether it exists in the registry).
- * Syntax: which &lt;command&gt;
+ * Shows whether commands are available in the shell registry.
+ * Syntax: {@code which <command> [command2 ...]}.
  *
- * <p><b>Owner: C — stub; to be implemented.</b></p>
- * <p>
- * TODO: Member C should implement:
- * - Look up command in the registry
- * - Return /usr/bin/&lt;name&gt; for found commands
- * - Return error for unknown commands
+ * <p>For each queried command, this implementation prints a simulated path
+ * ({@code /bin/<name>}) when found, or {@code <name>: not found} when missing.</p>
  */
 public class WhichCommand implements Command {
 

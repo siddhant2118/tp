@@ -111,7 +111,6 @@ public class FindCommand implements Command {
 
     /**
      * Checks whether a file's size matches the size filter expression.
-     * <p><b>[v2.0 stub]</b></p>
      *
      * @param sizeFilter the filter string, e.g. "+100", "-50", or "200"
      * @param fileSize   the actual file size in bytes

@@ -5,13 +5,9 @@ import linuxlingo.shell.ShellSession;
 
 /**
  * Prints the current user name.
- * Syntax: whoami
+ * Syntax: {@code whoami}.
  *
- * <p><b>Owner: C — stub; to be implemented.</b></p>
- * <p>
- * TODO: Member C should implement:
- * - Return "user" as the current username
- * - Return error if extra arguments provided
+ * <p>This simulator returns a fixed user value ({@code user}).</p>
  */
 public class WhoamiCommand implements Command {
 

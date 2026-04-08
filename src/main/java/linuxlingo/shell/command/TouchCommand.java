@@ -7,7 +7,7 @@ import linuxlingo.shell.vfs.VfsException;
 /**
  * Creates an empty file.
  * <p><b>v1.0</b>: Single file creation.</p>
- * <p><b>v2.0 [TODO]</b>: Support creating multiple files in one command.</p>
+ * <p><b>v2.0</b>: Supports creating multiple files in one command.</p>
  */
 public class TouchCommand implements Command {
     @Override

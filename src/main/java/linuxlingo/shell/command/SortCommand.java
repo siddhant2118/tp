@@ -13,8 +13,8 @@ import linuxlingo.shell.vfs.VfsException;
  * Sorts lines of a file.
  * Syntax: sort [-r] [-n] &lt;file&gt;
  *
- * <p><b>v1.0</b>: Sort with -r (reverse) and -n (numeric) flags.</p>
- * <p><b>v2.0 [TODO]</b>: Add -u flag to output only unique lines after sorting.</p>
+ * <p><b>v1.0</b>: Sort with {@code -r} (reverse) and {@code -n} (numeric) flags.</p>
+ * <p><b>v2.0</b>: Adds {@code -u} to keep only unique lines after sorting.</p>
  *
  * <p><b>Owner: C</b></p>
  */

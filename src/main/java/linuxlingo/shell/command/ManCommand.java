@@ -5,14 +5,10 @@ import linuxlingo.shell.ShellSession;
 
 /**
  * Displays the manual page for a given command.
- * Syntax: man &lt;command&gt;
+ * Syntax: {@code man <command>}.
  *
- * <p><b>Owner: C — stub; to be implemented.</b></p>
- * <p>
- * TODO: Member C should implement:
- * - Look up the command in the registry
- * - Display NAME, SYNOPSIS (usage), and DESCRIPTION sections
- * - Return error for unknown commands
+ * <p>The output includes NAME, SYNOPSIS, and DESCRIPTION sections generated
+ * from the command's {@code getUsage()} and {@code getDescription()} metadata.</p>
  */
 public class ManCommand implements Command {
 

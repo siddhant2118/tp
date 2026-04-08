@@ -10,7 +10,7 @@ import linuxlingo.shell.vfs.VfsException;
 /**
  * Creates a directory.
  * <p><b>v1.0</b>: Single directory creation with optional -p flag.</p>
- * <p><b>v2.0 [TODO]</b>: Support multiple directory paths in one command.</p>
+ * <p><b>v2.0</b>: Supports creating multiple directory paths in one command.</p>
  */
 public class MkdirCommand implements Command {
     @Override

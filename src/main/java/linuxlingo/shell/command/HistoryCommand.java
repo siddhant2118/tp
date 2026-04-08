@@ -11,24 +11,13 @@ import linuxlingo.shell.ShellSession;
  * <p>Usage: {@code history -c} — clears the command history.</p>
  * <p>Usage: {@code history N} — shows the last N commands.</p>
  *
- * <p><b>Owner: A — stub; to be implemented.</b></p>
- *
- * TODO: Member A should implement:
- * - List numbered history entries
- * - -c flag to clear history
- * - Numeric argument to limit output
- * - Fall back to in-memory history if no ShellLineReader
+ * <p>Supports listing all entries, clearing history with {@code -c}, and
+ * limiting output to the last {@code N} commands.</p>
  */
 public class HistoryCommand implements Command {
 
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        // [v2.0 STUB] TODO: Implement history command.
-        // No args: list numbered history entries.
-        // -c flag: clear history.
-        // Numeric arg N: show last N commands.
-        // Fall back to session.getCommandHistory() if no ShellLineReader.
-
         List<String> history = session.getCommandHistory();
 
         if (args.length > 0 && args[0].equals("-c")) {
@@ -44,8 +33,11 @@ public class HistoryCommand implements Command {
     }
 
     /**
-     * Show only the last n entries;
-     * returns an error if n is not a valid integer
+     * Returns up to the last {@code n} history entries.
+     *
+     * @param history source command history
+     * @param nStr user-provided count
+     * @return limited history output or an error when {@code nStr} is invalid
      */
     private CommandResult showLastN(List<String> history, String nStr) {
         int n;
@@ -64,7 +56,11 @@ public class HistoryCommand implements Command {
     }
 
     /**
-     * Format history entries as a numbered list
+     * Formats history entries as a numbered list from {@code fromIndex}.
+     *
+     * @param history source command history
+     * @param fromIndex zero-based start index
+     * @return formatted history output
      */
     private CommandResult formatHistory(List<String> history, int fromIndex) {
         if (history.isEmpty()) {

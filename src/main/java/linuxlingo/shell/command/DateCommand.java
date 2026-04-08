@@ -8,12 +8,12 @@ import linuxlingo.shell.ShellSession;
 
 /**
  * Prints the current date and time.
- * Syntax: date
+ * Syntax: {@code date [+FORMAT]}.
  *
- * <p><b>Owner: C — stub; to be implemented.</b></p>
- * <p>
- * TODO: Member C should implement:
- * - Format current date/time using pattern "EEE MMM dd HH:mm:ss yyyy"
+ * <p>Without arguments, this command uses the default format
+ * {@code EEE MMM dd HH:mm:ss yyyy}. If {@code +FORMAT} is provided,
+ * it accepts either Java {@link java.time.format.DateTimeFormatter} syntax
+ * or a subset of {@code strftime} tokens (for example, {@code +%Y-%m-%d}).</p>
  */
 public class DateCommand implements Command {
 
@@ -34,8 +34,8 @@ public class DateCommand implements Command {
 
     /**
      * Converts a Linux strftime format string to a Java DateTimeFormatter pattern.
-     * If the format contains '%' specifiers, they are converted; otherwise
-     * the format is returned as-is (assumed to be a Java pattern already).
+     * If the format contains '%' specifiers, they are converted. Otherwise,
+     * the format is returned as-is and treated as a Java formatter pattern.
      */
     private String convertStrftimeToJava(String format) {
         if (!format.contains("%")) {
