@@ -378,6 +378,15 @@ public class ShellParser {
             segments.add(buildSegment(currentWords, currentRedirect, currentInputRedirect));
         }
 
+        // Detect dangling redirect/pipe with no target (#139)
+        if (expectRedirectTarget || expectInputRedirectTarget) {
+            throw new IllegalArgumentException("syntax error: missing filename for redirect");
+        }
+        // If there's a trailing operator with no following segment, it's dangling
+        if (operators.size() >= segments.size() && !segments.isEmpty()) {
+            throw new IllegalArgumentException("syntax error: unexpected end of input after operator");
+        }
+
         assert operators.size() == Math.max(0, segments.size() - 1)
                 : "Invariant broken after parse: operators=" + operators.size()
                 + " segments=" + segments.size();

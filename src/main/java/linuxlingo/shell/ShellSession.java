@@ -250,7 +250,15 @@ public class ShellSession {
      *         zero-exit success result if the input was blank / produced no segments
      */
     private CommandResult runPlan(String input) {
-        ShellParser.ParsedPlan plan = new ShellParser().parse(input);
+        ShellParser.ParsedPlan plan;
+        try {
+            plan = new ShellParser().parse(input);
+        } catch (IllegalArgumentException e) {
+            String errorMsg = e.getMessage();
+            ui.println(errorMsg);
+            setLastExitCode(2);
+            return CommandResult.error(errorMsg);
+        }
 
         // Checking whether structure is invariant from the parser
         assert plan.operators.size() == Math.max(0, plan.segments.size() - 1)
@@ -265,6 +273,7 @@ public class ShellSession {
 
         CommandResult lastResult = CommandResult.success("");
         String pipedStdin = null; // stdout carried forward through a pipe
+        StringBuilder accumulatedStdout = new StringBuilder(); // accumulated stdout across segments
 
         for (int i = 0; i < plan.segments.size(); i++) {
             ShellParser.Segment segment = plan.segments.get(i);
@@ -281,12 +290,12 @@ public class ShellSession {
                 if (precedingOp == ShellParser.TokenType.AND && lastExitCode != 0) {
                     // the last command failed so skipping the next command
                     // && requires the previous command to have succeeded
-                    break;
+                    continue;
                 }
 
                 // TODO v2.0 (Owner A): handle OR operator
                 if (precedingOp == ShellParser.TokenType.OR && lastExitCode == 0) {
-                    break;
+                    continue;
                 }
 
                 if (precedingOp != ShellParser.TokenType.PIPE) {
@@ -302,7 +311,15 @@ public class ShellSession {
 
             // TODO v2.0 (Owner A): handle input redirect (< operator)
             if (segment.inputRedirect != null && !segment.inputRedirect.isEmpty()) {
-                stdin = vfs.readFile(segment.inputRedirect, workingDir);
+                try {
+                    stdin = vfs.readFile(segment.inputRedirect, workingDir);
+                } catch (linuxlingo.shell.vfs.VfsException e) {
+                    String errorMsg = e.getMessage();
+                    ui.println(errorMsg);
+                    setLastExitCode(1);
+                    lastResult = CommandResult.error(errorMsg);
+                    continue;
+                }
             }
 
             // TODO v2.0 (Owner A): resolve alias before registry lookup
@@ -337,16 +354,24 @@ public class ShellSession {
 
             // Handle output redirect (> or >>)
             if (segment.redirect != null) {
-                // Flush stdout to the target file; suppress it from terminal / pipe
-                vfs.writeFile(
-                        segment.redirect.target,
-                        workingDir,
-                        result.getStdout(),
-                        segment.redirect.isAppend()
-                );
-                // stdout consumed by redirect, replaced with an empty success so
-                // nothing gets printed or forwarded downstream
-                result = CommandResult.success("");
+                try {
+                    // Flush stdout to the target file; suppress it from terminal / pipe
+                    vfs.writeFile(
+                            segment.redirect.target,
+                            workingDir,
+                            result.getStdout(),
+                            segment.redirect.isAppend()
+                    );
+                    // stdout consumed by redirect, replaced with an empty success so
+                    // nothing gets printed or forwarded downstream
+                    result = CommandResult.success("");
+                } catch (linuxlingo.shell.vfs.VfsException e) {
+                    String errorMsg = e.getMessage();
+                    ui.println(errorMsg);
+                    setLastExitCode(1);
+                    lastResult = CommandResult.error(errorMsg);
+                    continue;
+                }
             }
 
             // Carry stdout forward if the next operator is PIPE
@@ -354,6 +379,13 @@ public class ShellSession {
                     && plan.operators.get(i) == ShellParser.TokenType.PIPE;
             if (nextIsPipe) {
                 pipedStdin = result.getStdout();
+            } else if (!result.getStdout().isEmpty()) {
+                // Accumulate intermediate stdout for non-pipe operators
+                // so output is not silently discarded (fix for #136)
+                accumulatedStdout.append(result.getStdout());
+                if (i < plan.segments.size() - 1) {
+                    accumulatedStdout.append("\n");
+                }
             }
 
             // Update session state
@@ -366,6 +398,11 @@ public class ShellSession {
             }
         }
 
+        // Return accumulated stdout from all segments (fix for #136)
+        String allStdout = accumulatedStdout.toString();
+        if (!allStdout.isEmpty()) {
+            return CommandResult.success(allStdout);
+        }
         return lastResult;
     }
 

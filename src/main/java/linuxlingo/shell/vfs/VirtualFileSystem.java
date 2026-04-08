@@ -313,6 +313,13 @@ public class VirtualFileSystem {
             throw new VfsException("Cannot move root directory");
         }
 
+        // Check for moving a directory into itself
+        String absSrc = getAbsolutePath(srcPath, workingDir);
+        String absDest = getAbsolutePath(destPath, workingDir);
+        if (absDest.startsWith(absSrc + "/")) {
+            throw new VfsException("mv: cannot move '" + srcPath + "' to a subdirectory of itself");
+        }
+
         FileNode destNode = null;
         try {
             destNode = resolve(destPath, workingDir);
