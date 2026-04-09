@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.HashSet;
+import java.util.Set;
 
 import linuxlingo.cli.Ui;
 import linuxlingo.shell.command.Command;
@@ -47,20 +49,6 @@ import linuxlingo.shell.vfs.VirtualFileSystem;
  *   <li>{@link ShellLineReader} — JLine terminal wrapper</li>
  *   <li>startInteractive() — JLine integration</li>
  * </ul>
- *
- * TODO: Member A should implement:
- * - Alias resolution in runPlan()
- * - || (OR) operator handling in runPlan()
- * - < input redirect handling in runPlan()
- * - Command history tracking in start()
- * - AliasCommand, UnaliasCommand, HistoryCommand
- *
- * TODO: Member B should implement:
- * - suggestCommand() / editDistance() — "Did you mean?" algorithm
- * - expandGlobs() / expandSingleGlob() — glob expansion
- * - startInteractive() — JLine integration
- * - ShellCompleter — tab-completion
- * - ShellLineReader — terminal wrapper & history
  */
 public class ShellSession {
 
@@ -69,6 +57,9 @@ public class ShellSession {
             "name", "type", "size", "exec", "perm", "path",
             "help", "sort", "file", "count"
     );
+
+    /** exit code: general error (e.g. failed redirect). */
+    private static final int EXIT_CODE_GENERAL_ERROR = 1;
 
     private VirtualFileSystem vfs;
     private String workingDir;
@@ -101,27 +92,28 @@ public class ShellSession {
     }
 
     /**
-     * Enter interactive shell REPL.
+     * Starts the interactive shell REPL.
      *
-     * <h4>v1.0 (implemented)</h4>
-     * <ol>
-     *   <li>Set {@code running = true}; print welcome message.</li>
-     *   <li>Read input using {@link Ui#readLine(String)} with the shell prompt.</li>
-     *   <li>Loop: read line → handle special words ("back", "exit", "done") → call
-     *       {@link #executePlan(String)}.</li>
-     * </ol>
+     * <p>The session reads input lines in a loop and executes them until termination.
+     * Input is obtained from a {@link ShellLineReader} if configured, otherwise
+     * falls back to {@link Ui#readLine(String)}.</p>
      *
-     * <h4>v2.0 TODO</h4>
-     * <p>If a {@link ShellLineReader} has been set via {@link #setLineReader},
-     * input should be read from JLine (with tab-completion and history).
-     * Otherwise, falls back to {@link Ui#readLine(String)}.
-     * Also track each command in {@code commandHistory}.</p>
+     * <p>Special handling:
+     * <ul>
+     *   <li>{@code null} input terminates the session (e.g. end of piped input).</li>
+     *   <li>Blank lines are ignored.</li>
+     *   <li>{@code exit} (case-insensitive) terminates the session.</li>
+     *   <li>Commands are recorded in history, except for {@code history} itself.</li>
+     * </ul>
+     * </p>
+     *
+     * <p>Each valid input line is passed to {@link #executePlan(String)} for execution.</p>
      */
     public void start() {
         assert !running : "start() called while session is already running";
 
         running = true;
-        LOGGER.info("Shell session started");
+        LOGGER.fine("Shell session started");
         ui.println("Welcome to LinuxLingo Shell! Type 'exit' to quit.");
 
         while (running) {
@@ -143,13 +135,14 @@ public class ShellSession {
             // Exit keyword stops the REPL
             String trimmed = input.trim();
             if (trimmed.equalsIgnoreCase("exit")) {
-                LOGGER.info("Exit keyword received... stopping REPL");
+                LOGGER.fine("Exit keyword received... stopping REPL");
                 running = false;
                 break;
             }
 
-            // TODO v2.0 (Owner A): track command in commandHistory
-            commandHistory.add(trimmed);
+            if (!trimmed.equals("history")) {
+                commandHistory.add(trimmed); // history should not record itself (mimics bash)
+            }
 
             executePlan(input);
         }
@@ -163,11 +156,6 @@ public class ShellSession {
      *
      * <p>v2.0 stub — to be implemented by Member B.</p>
      * <p>If JLine cannot initialise (e.g. no TTY), falls back to plain Ui input.</p>
-     *
-     * TODO: Member B — implement JLine integration:
-     * - Create ShellLineReader.create(this) 
-     * - Call start()
-     * - Close lineReader in finally block
      */
     public void startInteractive() {
         ShellLineReader originalReader = lineReader;
@@ -234,50 +222,23 @@ public class ShellSession {
     }
 
     /**
-     * Core plan execution engine shared by both {@link #executePlan} and
-     * {@link #executePlanSilent}.
-     *
-     * <h4>v1.0 Operator semantics (implemented):</h4>
-     * <ul>
-     *   <li>{@code PIPE}      — stdout of segment N becomes stdin of segment N+1</li>
-     *   <li>{@code AND}       — segment N+1 is skipped if lastExitCode != 0</li>
-     *   <li>{@code SEMICOLON} — segment N+1 always runs regardless of exit code</li>
-     * </ul>
-     *
-     * <h4>v2.0 TODO — additional semantics to implement:</h4>
-     * <ul>
-     *   <li>{@code OR}        — segment N+1 is skipped if lastExitCode == 0</li>
-     *   <li>Alias resolution: check aliases map before registry lookup</li>
-     *   <li>Input redirect: read file content as stdin when segment.inputRedirect is set</li>
-     *   <li>Glob expansion: expand wildcards in args before command execution</li>
-     *   <li>"Did you mean?": suggest similar command on command-not-found</li>
-     * </ul>
+     * Core plan execution engine shared by {@link #executePlan} and {@link #executePlanSilent}.
      *
      * @param input raw command string
-     * @return the {@link CommandResult} of the final executed segment, or a
-     *         zero-exit success result if the input was blank / produced no segments
+     * @return the {@link CommandResult} of the final executed segment, or an empty
+     *         success result if the input produced no segments
      */
     private CommandResult runPlan(String input) {
-        ShellParser.ParsedPlan plan;
-        try {
-            plan = new ShellParser().parse(input);
-        } catch (IllegalArgumentException e) {
-            String errorMsg = e.getMessage();
-            setLastExitCode(2);
-            return CommandResult.error(errorMsg);
+        ShellParser.ParsedPlan plan = parseInput(input);
+        if (plan == null || plan.segments.isEmpty()) {
+            return CommandResult.success("");
         }
 
-        // Checking whether structure is invariant from the parser
         assert plan.operators.size() == Math.max(0, plan.segments.size() - 1)
                 : "ParsedPlan invariant violated: operators=" + plan.operators.size()
                 + " segments=" + plan.segments.size();
 
-        // When nothing to execute
-        if (plan.segments.isEmpty()) {
-            LOGGER.fine("runPlan: no segments to execute");
-            return CommandResult.success("");
-        }
-
+        
         CommandResult lastResult = CommandResult.success("");
         String pipedStdin = null; // stdout carried forward through a pipe
         StringBuilder accumulatedStdout = new StringBuilder(); // accumulated stdout across segments
@@ -290,58 +251,26 @@ public class ShellSession {
             assert segment.commandName != null && !segment.commandName.isBlank()
                     : "Segment at index " + i + " has blank commandName";
 
-            // ── v1.0: Check the operator that precedes this segment ──
-            // operators.get(i-1) sits between segment[i-1] and segment[i]
-            if (i > 0) {
-                ShellParser.TokenType precedingOp = plan.operators.get(i - 1);
-
-                if (precedingOp == ShellParser.TokenType.AND && lastExitCode != 0) {
-                    // the last command failed so skipping the next command
-                    // && requires the previous command to have succeeded
-                    continue;
-                }
-
-                // TODO v2.0 (Owner A): handle OR operator
-                if (precedingOp == ShellParser.TokenType.OR && lastExitCode == 0) {
-                    continue;
-                }
-
-                if (precedingOp != ShellParser.TokenType.PIPE) {
-                    // SEMICOLON or AND (that passed): clear any leftover piped stdin
-                    pipedStdin = null;
-                }
-                // PIPE: pipedStdin was already set at the end of the previous iteration
+            if (shouldSkipSegment(plan, i)) {
+                continue;
             }
 
-            // pipedStdin is non-null only when the preceding operator was PIPE
-            String stdin = pipedStdin;
+            if (precedingOperatorIsNotPipe(plan, i)) {
+                pipedStdin = null;
+            }
+
+            String stdin = resolveStdin(segment, pipedStdin);
+            if (stdin == null && segment.inputRedirect != null) {
+                // resolveStdin failed — error already printed, skip this segment
+                pipedStdin = null;
+                lastResult = CommandResult.error("redirect failed");
+                continue;
+            }
             pipedStdin = null;
 
-            // TODO v2.0 (Owner A): handle input redirect (< operator)
-            if (segment.inputRedirect != null && !segment.inputRedirect.isEmpty()) {
-                try {
-                    stdin = vfs.readFile(segment.inputRedirect, workingDir);
-                } catch (linuxlingo.shell.vfs.VfsException e) {
-                    String errorMsg = e.getMessage();
-                    if (!accumulatedStderr.isEmpty()) {
-                        accumulatedStderr.append("\n");
-                    }
-                    accumulatedStderr.append(errorMsg);
-                    setLastExitCode(1);
-                    lastResult = CommandResult.error(errorMsg);
-                    continue;
-                }
-            }
+            String[] args = prepareArgs(segment);
+            Command command = resolveCommand(segment.commandName);
 
-            // TODO v2.0 (Owner A): resolve alias before registry lookup
-            String resolvedName = resolveAlias(segment.commandName);
-
-            String[] expandedArgs = expandCombinedFlags(segment.args);
-            expandedArgs = expandGlobs(expandedArgs);
-            expandedArgs = expandVariables(expandedArgs);
-
-            // v1.0: Look up command in registry (now uses resolved name)
-            Command command = registry.get(resolvedName);
             if (command == null) {
                 String errorMsg = segment.commandName + ": command not found";
                 LOGGER.log(Level.WARNING, "Command not found: ''{0}''", segment.commandName);
@@ -358,8 +287,7 @@ public class ShellSession {
                 continue; // no piped output from a missing command
             }
 
-            // ── v1.0: Execute the command ──
-            CommandResult result = command.execute(this, expandedArgs, stdin);
+            CommandResult result = command.execute(this, args, stdin);
 
             // Defer stderr printing to maintain correct output ordering (#147)
             if (!result.getStderr().isEmpty()) {
@@ -369,32 +297,12 @@ public class ShellSession {
                 accumulatedStderr.append(result.getStderr());
             }
 
-            // Handle output redirect (> or >>)
-            if (segment.redirect != null) {
-                try {
-                    // Flush stdout to the target file; suppress it from terminal / pipe
-                    vfs.writeFile(
-                            segment.redirect.target,
-                            workingDir,
-                            result.getStdout(),
-                            segment.redirect.isAppend()
-                    );
-                    // stdout consumed by redirect, replaced with an empty success so
-                    // nothing gets printed or forwarded downstream
-                    result = CommandResult.success("");
-                } catch (linuxlingo.shell.vfs.VfsException e) {
-                    String errorMsg = e.getMessage();
-                    if (!accumulatedStderr.isEmpty()) {
-                        accumulatedStderr.append("\n");
-                    }
-                    accumulatedStderr.append(errorMsg);
-                    setLastExitCode(1);
-                    lastResult = CommandResult.error(errorMsg);
-                    continue;
-                }
+            result = applyOutputRedirect(segment, result);
+            if (result == null) {
+                lastResult = CommandResult.error("redirect write failed");
+                continue;
             }
 
-            // Carry stdout forward if the next operator is PIPE
             boolean nextIsPipe = (i < plan.operators.size())
                     && plan.operators.get(i) == ShellParser.TokenType.PIPE;
             if (nextIsPipe) {
@@ -408,7 +316,6 @@ public class ShellSession {
                 accumulatedStdout.append(result.getStdout());
             }
 
-            // Update session state
             setLastExitCode(result.getExitCode());
             lastResult = result;
 
@@ -418,74 +325,309 @@ public class ShellSession {
             }
         }
 
-        // Return accumulated output from all segments (fix for #136, #147, #148)
         String allStdout = accumulatedStdout.toString();
-        String allStderr = accumulatedStderr.toString();
-        if (!allStdout.isEmpty() || !allStderr.isEmpty()) {
-            return CommandResult.of(allStdout, allStderr,
-                    lastResult.getExitCode(), lastResult.shouldExit());
-        }
-        return lastResult;
+        return allStdout.isEmpty() ? lastResult : CommandResult.success(allStdout);
     }
 
-    // Getters / Setters
+    /**
+     * Parses the raw input string. Prints and records any syntax error, then returns null.
+     *
+     * @param input raw command string
+     * @return the parsed plan, or {@code null} if parsing failed
+     */
+    private ShellParser.ParsedPlan parseInput(String input) {
+        try {
+            ShellParser.ParsedPlan plan = new ShellParser().parse(input);
+            if (plan.segments.isEmpty()) {
+                LOGGER.fine("runPlan: no segments to execute");
+            }
+            return plan;
+        } catch (IllegalArgumentException e) {
+            String errorMsg = e.getMessage();
+            ui.println(errorMsg);
+            setLastExitCode(ExitCodes.SYNTAX_ERROR);
+            return null;
+        }
+    }
 
+    /**
+     * Returns {@code true} if the segment at {@code index} should be skipped
+     * based on the preceding operator and the last exit code.
+     *
+     * <ul>
+     *   <li>{@code &&} — skips if the previous command failed (exit code != 0)</li>
+     *   <li>{@code ||} — skips if the previous command succeeded (exit code == 0)</li>
+     * </ul>
+     *
+     * @param plan  the parsed execution plan
+     * @param index the index of the segment being evaluated; 0 always returns false
+     * @return {@code true} if the segment should not execute
+     */
+    private boolean shouldSkipSegment(ShellParser.ParsedPlan plan, int index) {
+        if (index == 0) {
+            return false;
+        }
+        ShellParser.TokenType op = plan.operators.get(index - 1);
+        if (op == ShellParser.TokenType.AND && lastExitCode != 0) {
+            return true;
+        }
+        if (op == ShellParser.TokenType.OR && lastExitCode == 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns {@code true} if the operator immediately before segment {@code index}
+     * is not a pipe. When true, any stdin carried from a previous pipe should be cleared.
+     *
+     * @param plan  the parsed execution plan
+     * @param index the index of the segment being evaluated; 0 always returns false
+     * @return {@code true} if the preceding operator is not {@code PIPE}
+     */
+    private boolean precedingOperatorIsNotPipe(ShellParser.ParsedPlan plan, int index) {
+        if (index == 0) {
+            return false;
+        }
+        return plan.operators.get(index - 1) != ShellParser.TokenType.PIPE;
+    }
+
+    /**
+     * Resolves the effective stdin for a segment.
+     * Input redirect ({@code <}) takes precedence over a piped stdin.
+     * Returns {@code null} (with error already printed) if the redirect file cannot be read.
+     *
+     * @param segment    the current segment
+     * @param pipedStdin stdin carried from an upstream pipe, may be null
+     * @return the resolved stdin string, or {@code null} on redirect failure
+     */
+    private String resolveStdin(ShellParser.Segment segment, String pipedStdin) {
+        if (segment.inputRedirect == null || segment.inputRedirect.isEmpty()) {
+            return pipedStdin;
+        }
+        try {
+            return vfs.readFile(segment.inputRedirect, workingDir);
+        } catch (linuxlingo.shell.vfs.VfsException e) {
+            String errorMsg = e.getMessage();
+            ui.println(errorMsg);
+            LOGGER.warning("Input redirect failed: " + errorMsg);
+            setLastExitCode(ExitCodes.GENERAL_ERROR);
+            return null;
+        }
+    }
+
+    /**
+     * Expands combined flags, globs, and variables in the segment's arguments.
+     *
+     * @param segment the current segment
+     * @return fully expanded argument array
+     */
+    private String[] prepareArgs(ShellParser.Segment segment) {
+        String[] args = expandCombinedFlags(segment.args);
+        args = expandGlobs(args);
+        return expandVariables(args);
+    }
+
+    /**
+     * Resolves a command name (after alias expansion) to a {@link Command} instance.
+     *
+     * @param rawName the command name as typed
+     * @return the resolved {@link Command}, or {@code null} if not found
+     */
+    private Command resolveCommand(String rawName) {
+        String resolvedName = resolveAlias(rawName);
+        return registry.get(resolvedName);
+    }
+
+    /**
+     * Handles the command-not-found case: prints an error (with a "Did you mean?" hint
+     * if available), sets exit code 127, and returns an error result.
+     *
+     * @param commandName the unrecognised command name
+     * @return an error {@link CommandResult}
+     */
+    private CommandResult handleCommandNotFound(String commandName) {
+        String errorMsg = commandName + ": command not found";
+        LOGGER.log(Level.WARNING, "Command not found: ''{0}''", commandName);
+        String suggestion = suggestCommand(commandName);
+        if (suggestion != null) {
+            errorMsg += "\n" + suggestion;
+        }
+        ui.println(errorMsg);
+        setLastExitCode(ExitCodes.COMMAND_NOT_FOUND);
+        return CommandResult.error(errorMsg);
+    }
+
+    /**
+     * Applies an output redirect ({@code >} or {@code >>}) if present.
+     * Returns an empty-stdout success result on success so nothing is printed to
+     * the terminal, or {@code null} if the write fails (error already printed).
+     *
+     * @param segment the current segment
+     * @param result  the result produced by the command
+     * @return the (possibly replaced) result, or {@code null} on write failure
+     */
+    private CommandResult applyOutputRedirect(ShellParser.Segment segment, CommandResult result) {
+        if (segment.redirect == null) {
+            return result;
+        }
+        try {
+            vfs.writeFile(
+                    segment.redirect.target,
+                    workingDir,
+                    result.getStdout(),
+                    segment.redirect.isAppend()
+            );
+            return CommandResult.success("");
+        } catch (linuxlingo.shell.vfs.VfsException e) {
+            String errorMsg = e.getMessage();
+            ui.println(errorMsg);
+            LOGGER.warning("Output redirect failed: " + errorMsg);
+            setLastExitCode(ExitCodes.GENERAL_ERROR);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the virtual file system attached to this session.
+     *
+     * @return the current {@link VirtualFileSystem}
+     */
     public VirtualFileSystem getVfs() {
         return vfs;
     }
 
+    /**
+     * Returns the current working directory path.
+     *
+     * @return absolute path of the working directory
+     */
     public String getWorkingDir() {
         return workingDir;
     }
 
+    /**
+     * Sets the shell's current working directory.
+     *
+     * @param path the new working directory path; must not be null or blank
+     * @throws IllegalArgumentException if {@code path} is null or blank
+     */
     public void setWorkingDir(String path) {
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("setWorkingDir: path must not be null or blank");
+        }
         this.workingDir = path;
     }
 
+    /**
+     * Returns the previous working directory, used by {@code cd -}.
+     *
+     * @return the previous directory path, or {@code null} if there is none
+     */
     public String getPreviousDir() {
         return previousDir;
     }
 
+    /**
+     * Sets the shell's previous working directory (used by {@code cd -}).
+     *
+     * @param dir the previous directory path, or {@code null} to clear it
+     */
     public void setPreviousDir(String dir) {
+        // null argument is still valid here because it would mean no previous directory was there
         this.previousDir = dir;
     }
 
+    /**
+     * Returns the exit code of the most recently executed command.
+     *
+     * @return the last exit code
+     */
     public int getLastExitCode() {
         return lastExitCode;
     }
 
+    /**
+     * Sets the exit code of the most recently executed command.
+     *
+     * @param code the exit code to record
+     */
     public void setLastExitCode(int code) {
         this.lastExitCode = code;
     }
 
+
+    /**
+     * Returns the command registry containing all registered shell commands.
+     *
+     * @return the {@link CommandRegistry}
+     */
     public CommandRegistry getRegistry() {
         return registry;
     }
 
+    /**
+     * Returns the UI used for printing output and reading input.
+     *
+     * @return the {@link Ui}
+     */
     public Ui getUi() {
         return ui;
     }
 
+    /**
+     * Returns the shell prompt string reflecting the current working directory.
+     *
+     * @return prompt string in the format {@code user@linuxlingo:<dir>$ }
+     */
     public String getPrompt() {
         return "user@linuxlingo:" + workingDir + "$ ";
     }
 
+    /**
+     * Replaces the virtual file system for this session.
+     * Intended for use in tests and level-reset scenarios.
+     *
+     * @param newVfs the replacement {@link VirtualFileSystem}; must not be null
+     */
     public void replaceVfs(VirtualFileSystem newVfs) {
         this.vfs = newVfs;
     }
 
+    /**
+     * Returns whether the shell REPL is currently running.
+     *
+     * @return {@code true} if the session is active
+     */
     public boolean isRunning() {
         return running;
     }
 
+    /**
+     * Returns the live alias map for this session.
+     * Modifications to the returned map directly affect alias resolution.
+     *
+     * @return mutable map of alias name to alias value
+     */
     public Map<String, String> getAliases() {
         return aliases;
     }
 
+    /**
+     * Returns the current JLine line reader, if one has been set.
+     *
+     * @return the {@link ShellLineReader}, or {@code null} if using plain UI input
+     */
     public ShellLineReader getLineReader() {
         return lineReader;
     }
 
+    /**
+     * Sets the JLine line reader to use for interactive input.
+     * Pass {@code null} to fall back to plain {@link Ui} input.
+     *
+     * @param reader the {@link ShellLineReader} to use, or {@code null}
+     */
     public void setLineReader(ShellLineReader reader) {
         this.lineReader = reader;
     }
@@ -504,7 +646,6 @@ public class ShellSession {
     /**
      * Suggest a similar command name using edit distance.
      *
-     * <p>v2.0 stub — to be implemented by Member B.</p>
      * <p>Should iterate all registered command names, compute edit distance,
      * and return "Did you mean 'X'?" if the best match has distance ≤ 2.</p>
      *
@@ -538,7 +679,6 @@ public class ShellSession {
     /**
      * Compute Levenshtein edit distance between two strings.
      *
-     * <p>v2.0 stub — to be implemented by Member B.</p>
      * <p>Use dynamic programming: dp[i][j] = min edits to transform a[0..i-1] to b[0..j-1].</p>
      *
      * @param a first string
@@ -625,7 +765,6 @@ public class ShellSession {
     /**
      * Expand glob patterns (*, ?) in arguments against the VFS.
      *
-     * <p>v2.0 stub — to be implemented by Member B.</p>
      * <p>For each arg containing wildcards and a path separator,
      * expand against VFS using {@link #expandSingleGlob(String)}.
      * If no matches, keep the literal arg.</p>
@@ -637,7 +776,7 @@ public class ShellSession {
         List<String> expanded = new ArrayList<>();
         for (String arg : args) {
             // Skip single-quoted tokens (marked with \0 prefix)
-            if (arg.startsWith("\0")) {
+            if (arg.startsWith(ShellParser.SINGLE_QUOTE_MARKER)) {
                 expanded.add(arg);
                 continue;
             }
@@ -660,7 +799,6 @@ public class ShellSession {
     /**
      * Expand a single glob pattern against the VFS.
      *
-     * <p>v2.0 stub — to be implemented by Member B.</p>
      * <p>Split the pattern at the last '/', use the prefix as the directory
      * and the suffix as the file pattern. Use
      * {@link VirtualFileSystem#findByName(String, String, String)} for matching.</p>
@@ -714,13 +852,14 @@ public class ShellSession {
     }
 
     /**
-     * Resolve a command name through the alias map
+     * Resolves a command name through the alias map, following chains of aliases.
+     * Stops if a cycle is detected to prevent infinite loops.
      *
-     * @param name the raw command name (possibly an alias)
-     * @return the resolved command name
+     * @param name the raw command name typed by the user
+     * @return the fully resolved command name, or the original if no alias exists
      */
     private String resolveAlias(String name) {
-        java.util.Set<String> visited = new java.util.HashSet<>();
+        Set<String> visited = new HashSet<>();
         String resolved = name;
         while (aliases.containsKey(resolved) && visited.add(resolved)) {
             resolved = aliases.get(resolved);
@@ -740,7 +879,7 @@ public class ShellSession {
     public String[] expandVariables(String[] args) {
         String[] expanded = new String[args.length];
         for (int i = 0; i < args.length; i++) {
-            if (args[i].startsWith("\0")) {
+            if (args[i].startsWith(ShellParser.SINGLE_QUOTE_MARKER)) {
                 // Single-quoted token: strip marker, skip variable expansion
                 expanded[i] = args[i].substring(1);
             } else {
