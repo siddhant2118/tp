@@ -1,6 +1,7 @@
 package linuxlingo.shell.command;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import linuxlingo.shell.CommandResult;
@@ -21,12 +22,19 @@ public class DateCommand implements Command {
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         String format = "EEE MMM dd HH:mm:ss yyyy";
         if (args.length > 0 && args[0].startsWith("+")) {
-            format = convertStrftimeToJava(args[0].substring(1));
+            String rawFormat = args[0].substring(1);
+            // Handle %s (Unix epoch seconds) specially — it cannot be
+            // expressed as a DateTimeFormatter pattern.
+            if (rawFormat.equals("%s")) {
+                return CommandResult.success(String.valueOf(Instant.now().getEpochSecond()));
+            }
+            format = convertStrftimeToJava(rawFormat);
         }
 
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
-            return CommandResult.success(LocalDateTime.now().format(formatter));
+            // Use ZonedDateTime so timezone-related specifiers (%Z → 'z') work.
+            return CommandResult.success(ZonedDateTime.now().format(formatter));
         } catch (IllegalArgumentException e) {
             return CommandResult.error("date: invalid date format");
         }
@@ -100,7 +108,8 @@ public class DateCommand implements Command {
                     sb.append("'%'");
                     break;
                 default:
-                    sb.append('%').append(spec);
+                    // Unknown specifier — keep literal %X by quoting both chars
+                    sb.append("'%").append(spec).append("'");
                     break;
                 }
             } else {

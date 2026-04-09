@@ -45,6 +45,13 @@ public class MvCommand implements Command {
         }
 
         try {
+            // Detect moving a file to itself
+            String absSrc = session.getVfs().getAbsolutePath(paths.get(0), session.getWorkingDir());
+            String absDest = session.getVfs().getAbsolutePath(paths.get(1), session.getWorkingDir());
+            if (absSrc.equals(absDest)) {
+                return CommandResult.error("mv: '" + paths.get(0) + "' and '" + paths.get(1)
+                        + "' are the same file");
+            }
             session.getVfs().move(paths.get(0), paths.get(1), session.getWorkingDir());
             return CommandResult.success("");
         } catch (VfsException e) {

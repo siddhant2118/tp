@@ -80,6 +80,8 @@ public class ShellSession {
     private final Map<String, String> aliases;
     private ShellLineReader lineReader;
     private final List<String> commandHistory;
+    /** Ordered output from the last runPlan() call, for interactive display. */
+    private String lastOrderedOutput = "";
 
     public ShellSession(VirtualFileSystem vfs, Ui ui) {
         if (vfs == null) {
@@ -216,13 +218,25 @@ public class ShellSession {
      */
     private void executePlan(String input) {
         CommandResult result = runPlan(input);
-        // Print stderr first, then stdout to match display ordering (#147)
-        if (result != null && !result.getStderr().isEmpty()) {
-            ui.println(result.getStderr());
-        }
-        // Print the final stdout produced by the last segment
-        if (result != null && !result.getStdout().isEmpty()) {
-            ui.println(result.getStdout());
+        // Use ordered output for interactive display to preserve
+        // correct interleaving of stdout and stderr (#147, #161, #162)
+        if (result != null && !lastOrderedOutput.isEmpty()) {
+            String out = lastOrderedOutput;
+            // Use print instead of println if output already ends with \n
+            // to avoid double-newline artefacts (#162)
+            if (out.endsWith("\n")) {
+                ui.print(out);
+            } else {
+                ui.println(out);
+            }
+        } else {
+            // Fallback: print stderr then stdout separately
+            if (result != null && !result.getStderr().isEmpty()) {
+                ui.println(result.getStderr());
+            }
+            if (result != null && !result.getStdout().isEmpty()) {
+                ui.println(result.getStdout());
+            }
         }
     }
 
@@ -280,8 +294,11 @@ public class ShellSession {
 
         CommandResult lastResult = CommandResult.success("");
         String pipedStdin = null; // stdout carried forward through a pipe
-        StringBuilder accumulatedStdout = new StringBuilder(); // accumulated stdout across segments
-        StringBuilder accumulatedStderr = new StringBuilder(); // accumulated stderr across segments
+        // Use a single ordered list to preserve interleaving of stdout/stderr (#161)
+        StringBuilder orderedOutput = new StringBuilder();
+        // Also track separate stdout/stderr for programmatic callers (#161)
+        StringBuilder accumulatedStdout = new StringBuilder();
+        StringBuilder accumulatedStderr = new StringBuilder();
 
         for (int i = 0; i < plan.segments.size(); i++) {
             ShellParser.Segment segment = plan.segments.get(i);
@@ -291,52 +308,57 @@ public class ShellSession {
                     : "Segment at index " + i + " has blank commandName";
 
             // ── v1.0: Check the operator that precedes this segment ──
-            // operators.get(i-1) sits between segment[i-1] and segment[i]
             if (i > 0) {
                 ShellParser.TokenType precedingOp = plan.operators.get(i - 1);
 
                 if (precedingOp == ShellParser.TokenType.AND && lastExitCode != 0) {
-                    // the last command failed so skipping the next command
-                    // && requires the previous command to have succeeded
                     continue;
                 }
 
-                // TODO v2.0 (Owner A): handle OR operator
+                // v2.0: handle OR operator
                 if (precedingOp == ShellParser.TokenType.OR && lastExitCode == 0) {
                     continue;
                 }
 
                 if (precedingOp != ShellParser.TokenType.PIPE) {
-                    // SEMICOLON or AND (that passed): clear any leftover piped stdin
                     pipedStdin = null;
                 }
-                // PIPE: pipedStdin was already set at the end of the previous iteration
             }
 
             // pipedStdin is non-null only when the preceding operator was PIPE
             String stdin = pipedStdin;
             pipedStdin = null;
 
-            // TODO v2.0 (Owner A): handle input redirect (< operator)
+            // v2.0: handle input redirect (< operator)
             if (segment.inputRedirect != null && !segment.inputRedirect.isEmpty()) {
                 try {
                     stdin = vfs.readFile(segment.inputRedirect, workingDir);
                 } catch (linuxlingo.shell.vfs.VfsException e) {
                     String errorMsg = e.getMessage();
-                    if (!accumulatedStderr.isEmpty()) {
-                        accumulatedStderr.append("\n");
-                    }
-                    accumulatedStderr.append(errorMsg);
+                    appendToOrderedOutput(orderedOutput, errorMsg);
+                    appendToAccumulator(accumulatedStderr, errorMsg);
                     setLastExitCode(1);
                     lastResult = CommandResult.error(errorMsg);
                     continue;
                 }
             }
 
-            // TODO v2.0 (Owner A): resolve alias before registry lookup
-            String resolvedName = resolveAlias(segment.commandName);
+            // v2.0: resolve alias before registry lookup
+            List<String> aliasArgs = new ArrayList<>();
+            String resolvedName = resolveAlias(segment.commandName, aliasArgs);
 
-            String[] expandedArgs = expandCombinedFlags(segment.args);
+            // Merge alias-provided args in front of the segment's own args
+            String[] segArgs = segment.args;
+            if (!aliasArgs.isEmpty()) {
+                String[] merged = new String[aliasArgs.size() + segArgs.length];
+                for (int a = 0; a < aliasArgs.size(); a++) {
+                    merged[a] = aliasArgs.get(a);
+                }
+                System.arraycopy(segArgs, 0, merged, aliasArgs.size(), segArgs.length);
+                segArgs = merged;
+            }
+
+            String[] expandedArgs = expandCombinedFlags(segArgs);
             expandedArgs = expandGlobs(expandedArgs);
             expandedArgs = expandVariables(expandedArgs);
 
@@ -349,45 +371,36 @@ public class ShellSession {
                 if (suggestion != null) {
                     errorMsg += "\n" + suggestion;
                 }
-                if (!accumulatedStderr.isEmpty()) {
-                    accumulatedStderr.append("\n");
-                }
-                accumulatedStderr.append(errorMsg);
+                appendToOrderedOutput(orderedOutput, errorMsg);
+                appendToAccumulator(accumulatedStderr, errorMsg);
                 setLastExitCode(127);
                 lastResult = CommandResult.error(errorMsg);
-                continue; // no piped output from a missing command
+                continue;
             }
 
             // ── v1.0: Execute the command ──
             CommandResult result = command.execute(this, expandedArgs, stdin);
 
-            // Defer stderr printing to maintain correct output ordering (#147)
+            // Append stderr in execution order (#147, #161)
             if (!result.getStderr().isEmpty()) {
-                if (!accumulatedStderr.isEmpty()) {
-                    accumulatedStderr.append("\n");
-                }
-                accumulatedStderr.append(result.getStderr());
+                appendToOrderedOutput(orderedOutput, result.getStderr());
+                appendToAccumulator(accumulatedStderr, result.getStderr());
             }
 
             // Handle output redirect (> or >>)
             if (segment.redirect != null) {
                 try {
-                    // Flush stdout to the target file; suppress it from terminal / pipe
                     vfs.writeFile(
                             segment.redirect.target,
                             workingDir,
                             result.getStdout(),
                             segment.redirect.isAppend()
                     );
-                    // stdout consumed by redirect, replaced with an empty success so
-                    // nothing gets printed or forwarded downstream
                     result = CommandResult.success("");
                 } catch (linuxlingo.shell.vfs.VfsException e) {
                     String errorMsg = e.getMessage();
-                    if (!accumulatedStderr.isEmpty()) {
-                        accumulatedStderr.append("\n");
-                    }
-                    accumulatedStderr.append(errorMsg);
+                    appendToOrderedOutput(orderedOutput, errorMsg);
+                    appendToAccumulator(accumulatedStderr, errorMsg);
                     setLastExitCode(1);
                     lastResult = CommandResult.error(errorMsg);
                     continue;
@@ -398,14 +411,17 @@ public class ShellSession {
             boolean nextIsPipe = (i < plan.operators.size())
                     && plan.operators.get(i) == ShellParser.TokenType.PIPE;
             if (nextIsPipe) {
-                pipedStdin = result.getStdout();
-            } else if (!result.getStdout().isEmpty()) {
-                // Accumulate intermediate stdout for non-pipe operators
-                // so output is not silently discarded (fix for #136)
-                if (!accumulatedStdout.isEmpty()) {
-                    accumulatedStdout.append("\n");
+                // Ensure piped content ends with \n so downstream commands
+                // (e.g. wc -l) count lines correctly (#160)
+                String piped = result.getStdout();
+                if (!piped.isEmpty() && !piped.endsWith("\n")) {
+                    piped += "\n";
                 }
-                accumulatedStdout.append(result.getStdout());
+                pipedStdin = piped;
+            } else if (!result.getStdout().isEmpty()) {
+                // Append stdout in execution order (#136, #161, #162)
+                appendToOrderedOutput(orderedOutput, result.getStdout());
+                appendToAccumulator(accumulatedStdout, result.getStdout());
             }
 
             // Update session state
@@ -418,17 +434,46 @@ public class ShellSession {
             }
         }
 
-        // Return accumulated output from all segments (fix for #136, #147, #148)
+        // Return accumulated output from all segments
         String allStdout = accumulatedStdout.toString();
         String allStderr = accumulatedStderr.toString();
-        if (!allStdout.isEmpty() || !allStderr.isEmpty()) {
-            return CommandResult.of(allStdout, allStderr,
+        String allOrdered = orderedOutput.toString();
+        if (!allOrdered.isEmpty() || !allStdout.isEmpty() || !allStderr.isEmpty()) {
+            // Store the ordered output in a special field for executePlan to use.
+            // For programmatic callers (executeOnce), return separate stdout/stderr.
+            CommandResult combined = CommandResult.of(allStdout, allStderr,
                     lastResult.getExitCode(), lastResult.shouldExit());
+            // Stash ordered output for the interactive display path
+            lastOrderedOutput = allOrdered;
+            return combined;
         }
+        lastOrderedOutput = "";
         return lastResult;
     }
 
     // Getters / Setters
+
+    /**
+     * Appends text to the ordered output buffer, inserting a newline
+     * separator only when the buffer doesn't already end with one.
+     * This prevents double-newline artefacts (#162).
+     */
+    private void appendToOrderedOutput(StringBuilder buf, String text) {
+        if (!buf.isEmpty() && buf.charAt(buf.length() - 1) != '\n') {
+            buf.append("\n");
+        }
+        buf.append(text);
+    }
+
+    /**
+     * Appends text to an accumulator with a newline separator.
+     */
+    private void appendToAccumulator(StringBuilder buf, String text) {
+        if (!buf.isEmpty()) {
+            buf.append("\n");
+        }
+        buf.append(text);
+    }
 
     public VirtualFileSystem getVfs() {
         return vfs;
@@ -714,18 +759,40 @@ public class ShellSession {
     }
 
     /**
-     * Resolve a command name through the alias map
+     * Resolve a command name through the alias map.
+     * If the alias value contains spaces (e.g. "ls -la"), the first
+     * word becomes the resolved command name and the remaining words
+     * are returned as extra arguments via the supplied list.
      *
-     * @param name the raw command name (possibly an alias)
+     * @param name      the raw command name (possibly an alias)
+     * @param extraArgs a mutable list to which extra alias arguments are appended
      * @return the resolved command name
      */
-    private String resolveAlias(String name) {
+    private String resolveAlias(String name, List<String> extraArgs) {
         java.util.Set<String> visited = new java.util.HashSet<>();
         String resolved = name;
         while (aliases.containsKey(resolved) && visited.add(resolved)) {
             resolved = aliases.get(resolved);
         }
+        // If the resolved value contains spaces, split into command + args
+        if (resolved.contains(" ")) {
+            String[] parts = resolved.split("\\s+");
+            resolved = parts[0];
+            for (int k = 1; k < parts.length; k++) {
+                extraArgs.add(parts[k]);
+            }
+        }
         return resolved;
+    }
+
+    /**
+     * Resolve a command name through the alias map (no extra args variant).
+     *
+     * @param name the raw command name (possibly an alias)
+     * @return the resolved command name (first word only)
+     */
+    private String resolveAlias(String name) {
+        return resolveAlias(name, new ArrayList<>());
     }
 
     // ─── Variable expansion ─────────────────────────────────────

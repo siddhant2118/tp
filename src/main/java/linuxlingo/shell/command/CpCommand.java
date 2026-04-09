@@ -49,6 +49,13 @@ public class CpCommand implements Command {
         }
 
         try {
+            // Detect copying a file to itself
+            String absSrc = session.getVfs().getAbsolutePath(paths.get(0), session.getWorkingDir());
+            String absDest = session.getVfs().getAbsolutePath(paths.get(1), session.getWorkingDir());
+            if (absSrc.equals(absDest)) {
+                return CommandResult.error("cp: '" + paths.get(0) + "' and '" + paths.get(1)
+                        + "' are the same file");
+            }
             session.getVfs().copy(paths.get(0), paths.get(1), session.getWorkingDir(), recursive);
             return CommandResult.success("");
         } catch (VfsException e) {
