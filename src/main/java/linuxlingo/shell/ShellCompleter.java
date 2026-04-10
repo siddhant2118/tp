@@ -21,11 +21,6 @@ import linuxlingo.shell.vfs.FileNode;
  *   <li>Command names (from {@link CommandRegistry})</li>
  *   <li>VFS file/directory paths (absolute and relative)</li>
  * </ul>
- *
- * TODO: Member B should implement:
- * - complete() method integrating with JLine
- * - completeCommandName() for command name and alias completion
- * - completePath() for VFS path completion
  */
 public class ShellCompleter implements Completer {
     private final ShellSession session;

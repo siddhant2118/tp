@@ -150,7 +150,7 @@ public class GrepCommand implements Command {
             String line = linesArray[i];
             boolean matches;
 
-            if (useRegex) {
+            if (useRegex && patternRegex != null) {
                 Matcher matcher = patternRegex.matcher(line);
                 matches = matcher.find();
             } else {

@@ -251,10 +251,6 @@ public class ShellParser {
         return buildPlan(tokens);
     }
 
-    private Segment buildSegment(List<String> words, RedirectInfo redirect) {
-        return buildSegment(words, redirect, null);
-    }
-
     /**
      * Builds a segment from an accumulated word list.
      *
@@ -292,10 +288,6 @@ public class ShellParser {
             tokens.add(new Token(value, TokenType.WORD));
             current.setLength(0);
         }
-    }
-
-    private void flushCurrentToken(StringBuilder current, List<Token> tokens) throws IllegalArgumentException {
-        flushCurrentToken(current, tokens, false, false);
     }
 
     /**

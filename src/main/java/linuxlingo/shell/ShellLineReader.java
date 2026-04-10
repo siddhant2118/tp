@@ -28,11 +28,6 @@ import org.jline.terminal.TerminalBuilder;
  * <p>Create via {@link #create(ShellSession)} for interactive use, or
  * via {@link #createDumb(ShellSession)} for testing/non-interactive use.</p>
  *
- * TODO: Member B should implement:
- * - create() with system terminal
- * - createDumb() for testing
- * - readLine() with JLine integration
- * - History management (getHistory, addToHistory, getHistorySize)
  */
 public class ShellLineReader {
     private static final Logger LOGGER = Logger.getLogger(ShellLineReader.class.getName());
@@ -163,7 +158,7 @@ public class ShellLineReader {
         try {
             terminal.close();
         } catch (IOException e) {
-            LOGGER.warning("Failed to close terminal: " + e.getMessage());
+            LOGGER.warning(() -> "Failed to close terminal: " + e.getMessage());
         }
     }
 }

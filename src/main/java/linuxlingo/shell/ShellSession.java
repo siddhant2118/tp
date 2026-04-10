@@ -2,13 +2,13 @@ package linuxlingo.shell;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.HashSet;
-import java.util.Set;
 
 import linuxlingo.cli.Ui;
 import linuxlingo.shell.command.Command;
@@ -57,9 +57,6 @@ public class ShellSession {
             "name", "type", "size", "exec", "perm", "path",
             "help", "sort", "file", "count"
     );
-
-    /** exit code: general error (e.g. failed redirect). */
-    private static final int EXIT_CODE_GENERAL_ERROR = 1;
 
     private VirtualFileSystem vfs;
     private String workingDir;
@@ -419,13 +416,8 @@ public class ShellSession {
             return false;
         }
         ShellParser.TokenType op = plan.operators.get(index - 1);
-        if (op == ShellParser.TokenType.AND && lastExitCode != 0) {
-            return true;
-        }
-        if (op == ShellParser.TokenType.OR && lastExitCode == 0) {
-            return true;
-        }
-        return false;
+        return (op == ShellParser.TokenType.AND && lastExitCode != 0)
+                || (op == ShellParser.TokenType.OR && lastExitCode == 0);
     }
 
     /**
@@ -461,7 +453,7 @@ public class ShellSession {
         } catch (linuxlingo.shell.vfs.VfsException e) {
             String errorMsg = e.getMessage();
             ui.println(errorMsg);
-            LOGGER.warning("Input redirect failed: " + errorMsg);
+            LOGGER.warning(() -> "Input redirect failed: " + errorMsg);
             setLastExitCode(ExitCodes.GENERAL_ERROR);
             return null;
         }
@@ -506,25 +498,6 @@ public class ShellSession {
     }
 
     /**
-     * Handles the command-not-found case: prints an error (with a "Did you mean?" hint
-     * if available), sets exit code 127, and returns an error result.
-     *
-     * @param commandName the unrecognised command name
-     * @return an error {@link CommandResult}
-     */
-    private CommandResult handleCommandNotFound(String commandName) {
-        String errorMsg = commandName + ": command not found";
-        LOGGER.log(Level.WARNING, "Command not found: ''{0}''", commandName);
-        String suggestion = suggestCommand(commandName);
-        if (suggestion != null) {
-            errorMsg += "\n" + suggestion;
-        }
-        ui.println(errorMsg);
-        setLastExitCode(ExitCodes.COMMAND_NOT_FOUND);
-        return CommandResult.error(errorMsg);
-    }
-
-    /**
      * Applies an output redirect ({@code >} or {@code >>}) if present.
      * Returns an empty-stdout success result on success so nothing is printed to
      * the terminal, or {@code null} if the write fails (error already printed).
@@ -548,7 +521,7 @@ public class ShellSession {
         } catch (linuxlingo.shell.vfs.VfsException e) {
             String errorMsg = e.getMessage();
             ui.println(errorMsg);
-            LOGGER.warning("Output redirect failed: " + errorMsg);
+            LOGGER.warning(() -> "Output redirect failed: " + errorMsg);
             setLastExitCode(ExitCodes.GENERAL_ERROR);
             return null;
         }
@@ -943,16 +916,6 @@ public class ShellSession {
             }
         }
         return resolved;
-    }
-
-    /**
-     * Resolve a command name through the alias map (no extra args variant).
-     *
-     * @param name the raw command name (possibly an alias)
-     * @return the resolved command name (first word only)
-     */
-    private String resolveAlias(String name) {
-        return resolveAlias(name, new ArrayList<>());
     }
 
     // ─── Variable expansion ─────────────────────────────────────
