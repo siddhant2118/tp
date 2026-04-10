@@ -1,18 +1,25 @@
 package linuxlingo.shell.command;
 
 import java.util.Map;
+import java.util.logging.Logger;
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 
 /**
  * Creates or displays shell aliases.
- * Syntax: {@code alias [name=value]}.
  *
- * <p>Supports three modes:
- * list all aliases, print one alias by name, or define/update an alias using
- * {@code name=value}. Single quotes around values are stripped.</p>
+ * <p>Usage:</p>
+ * <ul>
+ *   <li>{@code alias}            — lists all currently defined aliases.</li>
+ *   <li>{@code alias name=value} — defines a new alias, stripping surrounding quotes.</li>
+ *   <li>{@code alias name}       — displays the value of a specific alias.</li>
+ * </ul>
  */
 public class AliasCommand implements Command {
+
+    private static final Logger LOGGER = Logger.getLogger(AliasCommand.class.getName());
+
+    private static final String ALIAS_FORMAT = "alias %s='%s'";
 
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
@@ -20,7 +27,11 @@ public class AliasCommand implements Command {
             return listAliases(session);
         }
 
-        // name without = : show that specific alias
+        if (args.length > 1) {
+            return CommandResult.error("alias: too many arguments");
+        }
+
+        // if name is provided without '=' then show that specific alias
         if (!args[0].contains("=")) {
             return showAlias(session, args[0]);
         }
@@ -29,78 +40,88 @@ public class AliasCommand implements Command {
     }
 
     /**
-     * Prints all aliases in shell-compatible syntax.
+     * Lists all currently defined aliases, one per line in {@code alias name='value'} format.
      *
-     * @param session active shell session
-     * @return alias listing, or empty output when none exist
+     * @param session the active shell session
+     * @return a {@link CommandResult} containing the formatted alias list, or empty if none defined
      */
     private CommandResult listAliases(ShellSession session) {
-        Map<String, String > aliases = session.getAliases();
+        Map<String, String> aliases = session.getAliases();
         if (aliases.isEmpty()) {
             return CommandResult.success("");
         }
 
-        StringBuilder sbuild = new StringBuilder();
+        StringBuilder output = new StringBuilder();
         for (Map.Entry<String, String> entry : aliases.entrySet()) {
-            if (sbuild.length() > 0) {
-                sbuild.append('\n');
+            if (!output.isEmpty()) {
+                output.append('\n');
             }
-            sbuild.append("alias ").append(entry.getKey()).append("='").append(entry.getValue()).append("'");
+            output.append(String.format(ALIAS_FORMAT, entry.getKey(), entry.getValue()));
         }
-        return CommandResult.success(sbuild.toString());
+        return CommandResult.success(output.toString());
     }
 
     /**
-     * Parses an alias definition and stores it in session aliases.
+     * Parses a {@code name=value} definition and stores it in the session's alias map.
+     * Surrounding single or double quotes are stripped from the value.
      *
-     * @param session active shell session
-     * @param definition the raw alias definition argument
-     * @return success when stored, or an error for invalid definitions
+     * @param session    the active shell session
+     * @param definition the raw alias definition (e.g. {@code ll=ls -la} or {@code ll='ls -la'})
+     * @return a {@link CommandResult} indicating success or a descriptive error
      */
     private CommandResult setAlias(ShellSession session, String definition) {
         int eqIndex = definition.indexOf('=');
+
+        // eqIndex == 0 means the name portion is empty (e.g. "=value")
+        // eqIndex < 0 means no '=' present at all, but setAlias() is only
+        // called when args[0].contains("="), so < 0 is defensive only
         if (eqIndex <= 0) {
             return CommandResult.error("alias: invalid format: '" + definition + "' (expected name=value)");
         }
 
         String name = definition.substring(0, eqIndex);
-        String value = definition.substring(eqIndex + 1);
-        value = stripSurroundingQuotes(value);
+        String value = stripSurroundingQuotes(definition.substring(eqIndex + 1));
 
         if (name.isBlank()) {
             return CommandResult.error("alias: name must not be blank");
         }
 
         session.getAliases().put(name, value);
+        LOGGER.fine(() -> "Alias set: " + name + " -> " + value);
         return CommandResult.success("");
     }
 
     /**
-     * Removes a single pair of surrounding single quotes from a value.
+     * Strips a matching pair of surrounding single or double quotes from {@code s}.
+     * If {@code s} is not surrounded by matching quotes, it is returned unchanged.
      *
-     * @param s raw alias value
-     * @return unquoted value when quoted, else the original string
+     * @param s the string to strip
+     * @return the unquoted string
      */
     private String stripSurroundingQuotes(String s) {
-        if (s.length() >= 2 && s.charAt(0) == '\'' && s.charAt(s.length() - 1) == '\'') {
-            return s.substring(1, s.length() - 1);
+        if (s.length() >= 2) {
+            char first = s.charAt(0);
+            char last = s.charAt((s.length() - 1));
+            if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
+                return s.substring(1, s.length() - 1);
+            }
         }
         return s;
     }
 
     /**
-     * Prints a specific alias by name.
+     * Displays the value of a single named alias.
      *
-     * @param session active shell session
-     * @param name alias key
-     * @return alias output or not-found error
+     * @param session the active shell session
+     * @param name    the alias name to look up
+     * @return a {@link CommandResult} with the alias definition, or an error if not found
      */
     private CommandResult showAlias(ShellSession session, String name) {
         String value = session.getAliases().get(name);
         if (value == null) {
             return CommandResult.error("alias: " + name + ": not found");
         }
-        return CommandResult.success("alias " + name + "='" + value + "'");
+        return CommandResult.success(String.format(ALIAS_FORMAT, name, value));
     }
 
     @Override

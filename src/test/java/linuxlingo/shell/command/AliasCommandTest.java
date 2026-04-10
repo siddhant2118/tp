@@ -92,4 +92,63 @@ public class AliasCommandTest {
     public void alias_getDescription_returnsString() {
         assertFalse(command.getDescription().isEmpty());
     }
+
+    @Test
+    public void alias_tooManyArgsReturnsError() {
+        CommandResult result = command.execute(session, new String[]{"ll=ls", "extra"}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("too many arguments"));
+    }
+
+    @Test
+    public void alias_setAliasWithDoubleQuotesStripsQuotes() {
+        CommandResult result = command.execute(session, new String[]{"ll=\"ls -la\""}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("ls -la", session.getAliases().get("ll"));
+    }
+
+    @Test
+    public void alias_setAliasWithMismatchedQuotesDoesNotStrip() {
+        command.execute(session, new String[]{"ll='ls -la\""}, null);
+        assertEquals("'ls -la\"", session.getAliases().get("ll"));
+    }
+
+    @Test
+    public void alias_setAliasValueContainingEqualsPreservesValue() {
+        CommandResult result = command.execute(session, new String[]{"eq=a=b"}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("a=b", session.getAliases().get("eq"));
+    }
+
+    @Test
+    public void alias_overwriteExistingAliasUpdatesValue() {
+        session.getAliases().put("ll", "ls");
+        command.execute(session, new String[]{"ll=ls -la"}, null);
+        assertEquals("ls -la", session.getAliases().get("ll"));
+    }
+
+    @Test
+    public void alias_multipleAliasesSeparatedByNewlines() {
+        session.getAliases().put("a", "cmd1");
+        session.getAliases().put("b", "cmd2");
+        CommandResult result = command.execute(session, new String[]{}, null);
+        assertTrue(result.isSuccess());
+        String[] lines = result.getStdout().split("\n");
+        assertEquals(2, lines.length);
+    }
+
+    @Test
+    public void alias_showAliasOutputMatchesCanonicalFormat() {
+        session.getAliases().put("gs", "git status");
+        CommandResult result = command.execute(session, new String[]{"gs"}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("alias gs='git status'", result.getStdout());
+    }
+
+    @Test
+    public void alias_notFoundErrorMessageContainsName() {
+        CommandResult result = command.execute(session, new String[]{"ghost"}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("ghost"));
+    }
 }

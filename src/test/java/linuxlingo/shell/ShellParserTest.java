@@ -443,4 +443,67 @@ class ShellParserTest {
         assertThrows(IllegalArgumentException.class, () -> parser.parse("echo hello >"),
                 "parse should throw IllegalArgumentException for redirect without target");
     }
+
+    @Test
+    public void parse_pipeInsideSingleQuotes_treatedAsLiteral() {
+        ShellParser.ParsedPlan plan = parser.parse("echo 'a|b'");
+        assertEquals(1, plan.segments.size());
+        assertEquals(0, plan.operators.size());
+        assertTrue(plan.segments.get(0).args[0].contains("a|b"));
+    }
+
+    @Test
+    public void parse_pipeInsideDoubleQuotes_treatedAsLiteral() {
+        ShellParser.ParsedPlan plan = parser.parse("echo \"a|b\"");
+        assertEquals(1, plan.segments.size());
+        assertEquals(0, plan.operators.size());
+        assertEquals("a|b", plan.segments.get(0).args[0]);
+    }
+
+    @Test
+    public void parse_redirectInsideDoubleQuotes_treatedAsLiteral() {
+        ShellParser.ParsedPlan plan = parser.parse("echo \"a>b\"");
+        assertEquals(1, plan.segments.size());
+        assertNull(plan.segments.get(0).redirect);
+        assertEquals("a>b", plan.segments.get(0).args[0]);
+    }
+
+    @Test
+    public void parse_semicolonInsideSingleQuotes_treatedAsLiteral() {
+        ShellParser.ParsedPlan plan = parser.parse("echo 'a;b'");
+        assertEquals(1, plan.segments.size());
+        assertEquals(0, plan.operators.size());
+    }
+
+    @Test
+    public void parse_whitespaceOnlyInput_returnsEmptyPlan() {
+        ShellParser.ParsedPlan plan = parser.parse("   \t  ");
+        assertEquals(0, plan.segments.size());
+        assertEquals(0, plan.operators.size());
+    }
+
+    @Test
+    public void parse_threeSemicolonChain_parsesCorrectly() {
+        ShellParser.ParsedPlan plan = parser.parse("cmd1 ; cmd2 ; cmd3");
+        assertEquals(3, plan.segments.size());
+        assertEquals(2, plan.operators.size());
+        assertEquals(ShellParser.TokenType.SEMICOLON, plan.operators.get(0));
+        assertEquals(ShellParser.TokenType.SEMICOLON, plan.operators.get(1));
+    }
+
+    @Test
+    public void parse_orNotConfusedWithDoublePipe_singleOrOperator() {
+        ShellParser.ParsedPlan plan = parser.parse("false || echo fallback");
+        assertEquals(1, plan.operators.size());
+        assertEquals(ShellParser.TokenType.OR, plan.operators.get(0));
+        assertEquals(2, plan.segments.size());
+    }
+
+    @Test
+    public void parse_inputRedirectOnSecondPipeSegment_attachedCorrectly() {
+        ShellParser.ParsedPlan plan = parser.parse("echo header | wc < data.txt");
+        assertEquals(2, plan.segments.size());
+        assertNull(plan.segments.get(0).inputRedirect);
+        assertEquals("data.txt", plan.segments.get(1).inputRedirect);
+    }
 }

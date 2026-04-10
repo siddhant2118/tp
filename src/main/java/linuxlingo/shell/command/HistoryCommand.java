@@ -1,43 +1,55 @@
 package linuxlingo.shell.command;
 
 import java.util.List;
+import java.util.logging.Logger;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 
 /**
- * Displays the command history.
+ * Displays the in-session command history.
  *
- * <p>Usage: {@code history} — lists all commands in the current session history.</p>
- * <p>Usage: {@code history -c} — clears the command history.</p>
- * <p>Usage: {@code history N} — shows the last N commands.</p>
- *
- * <p>Supports listing all entries, clearing history with {@code -c}, and
- * limiting output to the last {@code N} commands.</p>
+ * <p>Usage:</p>
+ * <ul>
+ *   <li>{@code history}    — lists all commands, numbered from 1.</li>
+ *   <li>{@code history N}  — shows the last N commands.</li>
+ *   <li>{@code history -c} — clears the command history.</li>
+ * </ul>
  */
 public class HistoryCommand implements Command {
+
+    private static final Logger LOGGER = Logger.getLogger(HistoryCommand.class.getName());
+
+    private static final String HISTORY_FORMAT = "%5d  %s";
 
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         List<String> history = session.getCommandHistory();
 
-        if (args.length > 0 && args[0].equals("-c")) {
+        if (args.length == 0) {
+            return formatHistory(history, 0);
+        }
+
+        if (args.length > 1) {
+            return CommandResult.error("history: too many arguemnts");
+        }
+
+        if (args[0].equals("-c")) {
             history.clear();
+            LOGGER.fine("Command history cleared");
             return CommandResult.success("");
         }
 
-        if (args.length > 0) {
-            return showLastN(history, args[0]);
-        }
-
-        return formatHistory(history, 0);
+        return showLastN(history, args[0]);
     }
 
     /**
-     * Returns up to the last {@code n} history entries.
+     * Returns the last {@code n} history entries as a formatted result.
+     * Returns an error result if the argument is not a valid non-negative integer.
      *
-     * @param history source command history
-     * @param nStr user-provided count
-     * @return limited history output or an error when {@code nStr} is invalid
+     * @param history the current command history list
+     * @param nStr    the raw argument string representing {@code N}
+     * @return a {@link CommandResult} with the last N entries, or an error
      */
     private CommandResult showLastN(List<String> history, String nStr) {
         int n;
@@ -56,25 +68,30 @@ public class HistoryCommand implements Command {
     }
 
     /**
-     * Formats history entries as a numbered list from {@code fromIndex}.
+     * Formats history entries as a numbered list starting from {@code fromIndex}.
+     * Uses two spaces between the number and command to match standard bash output.
      *
-     * @param history source command history
-     * @param fromIndex zero-based start index
-     * @return formatted history output
+     * @param history   the full history list
+     * @param fromIndex the index to start listing from (inclusive)
+     * @return a {@link CommandResult} containing the formatted output
      */
     private CommandResult formatHistory(List<String> history, int fromIndex) {
-        if (history.isEmpty()) {
+        assert fromIndex >= 0 : "fromIndex must be non-negative, got: " + fromIndex;
+        assert fromIndex <= history.size() : "fromIndex exceeds history size";
+
+        if (fromIndex >= history.size()) {
             return CommandResult.success("");
         }
 
-        StringBuilder sbuild = new StringBuilder();
+        StringBuilder output = new StringBuilder();
         for (int i = fromIndex; i < history.size(); i++) {
-            if (sbuild.length() > 0) {
-                sbuild.append('\n');
+            if (!output.isEmpty()) {
+                output.append('\n');
             }
-            sbuild.append(String.format("%5d %s", i + 1, history.get(i)));
+
+            output.append(String.format(HISTORY_FORMAT, i + 1, history.get(i)));
         }
-        return CommandResult.success(sbuild.toString());
+        return CommandResult.success(output.toString());
     }
     @Override
     public String getUsage() {

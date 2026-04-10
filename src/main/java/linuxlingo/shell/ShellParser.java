@@ -36,16 +36,53 @@ import java.util.logging.Logger;
  */
 public class ShellParser {
 
+    /**
+     * Prefix marker applied to single-quoted tokens to suppress glob
+     * and variable expansion. Chosen because \0 cannot appear in valid
+     * shell input. Consumers: expandGlobs(), expandVariables().
+     */
+    public static final String SINGLE_QUOTE_MARKER = "\0";
+
     private static final Logger LOGGER =  Logger.getLogger(ShellParser.class.getName());
 
+    /**
+     * Enumeration of token types recognized by the parser.
+     */
     public enum TokenType {
-        WORD, PIPE, REDIRECT, APPEND, AND, SEMICOLON, OR, INPUT_REDIRECT
+        /** A word (command name, argument, or filename) */
+        WORD,
+        /** Pipe operator {@code |} */
+        PIPE,
+        /** Output redirect operator {@code >} */
+        REDIRECT,
+        /** Append redirect operator {@code >>} */
+        APPEND,
+        /** Logical AND operator {@code &&} */
+        AND,
+        /** Statement separator {@code ;} */
+        SEMICOLON,
+        /** Logical OR operator {@code ||} */
+        OR,
+        /** Input redirect operator {@code <} */
+        INPUT_REDIRECT
     }
 
+    /**
+     * Represents a single token in the parsed input.
+     */
     public static class Token {
+        /** The literal string value of this token */
         public final String value;
+        /** The type classification of this token */
         public final TokenType type;
 
+        /**
+         * Constructs a new token.
+         *
+         * @param value the literal string value
+         * @param type the token type
+         * @throws IllegalArgumentException if value or type is null
+         */
         public Token(String value, TokenType type) throws IllegalArgumentException {
             Preconditions.requireNonNull(value, "Token.value");
             Preconditions.requireNonNull(type, "Token.type");
@@ -55,41 +92,80 @@ public class ShellParser {
 
         @Override
         public String toString() {
-
             return type + ":" + value;
         }
     }
 
+    /**
+     * Represents output redirection information for a command segment.
+     */
     public static class RedirectInfo {
-        public final String operator; // ">" or ">>"
-        public final String target;   // file path
+        /** The redirect operator: {@code ">"} or {@code ">>"} */
+        public final String operator;
+        /** The target file path for the redirection */
+        public final String target;
 
+        /**
+         * Constructs redirection information.
+         *
+         * @param operator the redirect operator ({@code ">"} or {@code ">>"})
+         * @param target the target file path
+         * @throws IllegalArgumentException if operator is not {@code ">"} or {@code ">>"},
+         *         or if target is null or blank
+         */
         public RedirectInfo(String operator, String target) {
             if (!">".equals(operator) && !">>".equals(operator)) {
                 throw new IllegalArgumentException("RedirectInfo operator must be '>' or '>>', got: " + operator);
             }
             if (target == null || target.isBlank()) {
-                throw new IllegalArgumentException("RedirectInfo target must no be null or blank");
+                throw new IllegalArgumentException("RedirectInfo target must not be null or blank");
             }
             this.operator = operator;
             this.target = target;
         }
 
+        /**
+         * Checks if this is an append redirection.
+         *
+         * @return {@code true} if operator is {@code ">>"}, {@code false} otherwise
+         */
         public boolean isAppend() {
             return ">>".equals(operator);
         }
     }
 
+    /**
+     * Represents a single command segment with its arguments and optional redirections.
+     */
     public static class Segment {
         public final String commandName;
+        /** The arguments passed to the command */
         public final String[] args;
+        /** Optional output redirection information */
         public final RedirectInfo redirect;
-        public final String inputRedirect; // file for < input redirect
+        /** Optional input redirection source file */
+        public final String inputRedirect;
 
+        /**
+         * Constructs a segment without input redirection.
+         *
+         * @param commandName the command name
+         * @param args the command arguments
+         * @param redirect optional output redirect info (may be null)
+         */
         public Segment(String commandName, String[] args, RedirectInfo redirect) {
             this(commandName, args, redirect, null);
         }
 
+        /**
+         * Constructs a segment with full redirection support.
+         *
+         * @param commandName the command name (must not be blank)
+         * @param args the command arguments (must not be null)
+         * @param redirect optional output redirect info (may be null)
+         * @param inputRedirect optional input redirect file (may be null)
+         * @throws IllegalArgumentException if commandName is blank or args is null
+         */
         public Segment(String commandName, String[] args, RedirectInfo redirect, String inputRedirect) {
             Preconditions.requireNonBlank(commandName, "Segment.commandName");
             Preconditions.requireNonNull(args, "Segment.args");
@@ -108,10 +184,24 @@ public class ShellParser {
         }
     }
 
+    /**
+     * Represents a complete parsed execution plan consisting of command segments
+     * and the operators connecting them.
+     */
     public static class ParsedPlan {
+        /** The list of command segments to execute */
         public final List<Segment> segments;
+        /** The operators connecting the segments (size = segments.size() - 1) */
         public final List<TokenType> operators;
 
+        /**
+         * Constructs a parsed execution plan.
+         *
+         * @param segments the command segments
+         * @param operators the connecting operators
+         * @throws IllegalArgumentException if segments or operators is null
+         * @throws AssertionError if operators.size() != max(0, segments.size() - 1)
+         */
         public ParsedPlan(List<Segment> segments, List<TokenType> operators) {
             Preconditions.requireNonNull(segments, "ParsedPlan.segments");
             Preconditions.requireNonNull(operators, "ParsedPlan.operators");
@@ -138,15 +228,16 @@ public class ShellParser {
     }
 
     /**
-     * Parse a raw input string into a {@link ParsedPlan}.
+     * Parses a raw input string into a structured execution plan.
      *
-     * <p>Steps:</p>
-     * <ol>
-     *   <li>Tokenize input — split by whitespace, respecting single/double quotes.
-     *       Recognize operators: {@code |}, {@code >}, {@code >>}, {@code &&}, {@code ;}.</li>
-     *   <li>Split token list by inter-segment operators (PIPE, AND, SEMICOLON).</li>
-     *   <li>Within each segment, extract command name, args, and optional redirect info.</li>
-     * </ol>
+     * <p>Tokenizes the input respecting quotes and shell operators
+     * ({@code |}, {@code >}, {@code >>}, {@code <}, {@code &&}, {@code ||}, {@code ;}),
+     * then groups tokens into command segments with their arguments and redirections.</p>
+     *
+     * @param input the raw command line input string
+     * @return a {@link ParsedPlan} containing the parsed segments and operators
+     * @throws IllegalArgumentException if the input contains syntax errors
+     *         (e.g., missing redirect target, dangling operators)
      */
     public ParsedPlan parse(String input) throws IllegalArgumentException {
 
@@ -165,15 +256,16 @@ public class ShellParser {
     }
 
     /**
-     * build a segment from an accumulated word list.
-     * @param words the accumulated word list
+     * Builds a segment from an accumulated word list.
+     *
+     * @param words the accumulated word list (first word is command name)
      * @param redirect optional output redirect
      * @param inputRedirect optional input redirect file
-     * @return the segment
+     * @return the constructed segment
      */
     private Segment buildSegment(List<String> words, RedirectInfo redirect, String inputRedirect) {
         assert words != null && !words.isEmpty()
-            : "buildSegmend() requires a non-empty word list";
+            : "buildSegment() requires a non-empty word list";
 
         String commandName = words.get(0);
         String[] args = new String[words.size()-1];
@@ -184,12 +276,19 @@ public class ShellParser {
         return new Segment(commandName, args, redirect, inputRedirect);
     }
 
+    /**
+     * Flushes the current accumulated token to the token list.
+     *
+     * @param current the current token being accumulated
+     * @param tokens the list to add the token to
+     * @param singleQuoted whether the token was single-quoted
+     */
     private void flushCurrentToken(StringBuilder current, List<Token> tokens,
             boolean singleQuoted, boolean wasQuoted) throws IllegalArgumentException {
         assert current != null : "current StringBuilder must not be null";
         assert tokens != null : "tokens list must not be null";
         if (!current.isEmpty() || wasQuoted) {
-            String value = singleQuoted ? "\0" + current.toString() : current.toString();
+            String value = singleQuoted ? SINGLE_QUOTE_MARKER + current.toString() : current.toString();
             tokens.add(new Token(value, TokenType.WORD));
             current.setLength(0);
         }
@@ -199,6 +298,15 @@ public class ShellParser {
         flushCurrentToken(current, tokens, false, false);
     }
 
+    /**
+     * Tokenizes the input string into a list of tokens.
+     *
+     * <p>Uses a character-by-character state machine to handle quotes,
+     * whitespace, operators, and escaping.</p>
+     *
+     * @param input the input string to tokenize
+     * @return a list of tokens
+     */
     private List<Token> tokenize(String input) {
         // Tokenizer (char-by-char state machine)
         List<Token> tokens = new ArrayList<>();
@@ -312,6 +420,17 @@ public class ShellParser {
         return tokens;
     }
 
+    /**
+     * Builds a parsed execution plan from a list of tokens.
+     *
+     * <p>Groups tokens into command segments, extracting operators,
+     * arguments, and redirection information.</p>
+     *
+     * @param tokens the list of tokens to process
+     * @return a {@link ParsedPlan} with segments and operators
+     * @throws IllegalArgumentException if syntax errors are detected
+     *         (missing redirect targets, dangling operators)
+     */
     private ParsedPlan buildPlan(List<Token> tokens) {
 
         List<Segment> segments = new ArrayList<>();

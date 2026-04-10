@@ -89,4 +89,48 @@ public class UnaliasCommandTest {
     public void unalias_getDescription_returnsString() {
         assertFalse(command.getDescription().isEmpty());
     }
+
+    @Test
+    public void unalias_dashAWithExtraName_returnsError() {
+        session.getAliases().put("ll", "ls -la");
+        CommandResult result = command.execute(session, new String[]{"-a", "ll"}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("cannot be used with alias names"));
+        // alias must not have been touched
+        assertTrue(session.getAliases().containsKey("ll"));
+    }
+
+    @Test
+    public void unalias_dashAOnEmptyMap_succeedsWithNoOutput() {
+        CommandResult result = command.execute(session, new String[]{"-a"}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("", result.getStdout());
+        assertTrue(session.getAliases().isEmpty());
+    }
+
+    @Test
+    public void unalias_unknownFlag_returnsInvalidOptionError() {
+        CommandResult result = command.execute(session, new String[]{"-b"}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("invalid option"));
+    }
+
+    @Test
+    public void unalias_notFoundErrorContainsMissingName() {
+        CommandResult result = command.execute(session, new String[]{"ghost"}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("ghost"));
+    }
+
+    @Test
+    public void unalias_mixedNames_allValidRemovedAndAllMissingReported() {
+        session.getAliases().put("a", "aa");
+        session.getAliases().put("b", "bb");
+        CommandResult result = command.execute(session, new String[]{"a", "missing1", "b", "missing2"}, null);
+        assertFalse(result.isSuccess());
+        assertFalse(session.getAliases().containsKey("a"));
+        assertFalse(session.getAliases().containsKey("b"));
+        assertTrue(result.getStderr().contains("missing1"));
+        assertTrue(result.getStderr().contains("missing2"));
+    }
 }

@@ -187,4 +187,28 @@ public class HistoryCommandTest {
             assertEquals("pwd", session.getCommandHistory().get(1));
         }
     }
+
+    @Test
+    public void tooManyArgs_returnsError() {
+        CommandResult result = command.execute(session, new String[]{"3", "extra"}, null);
+        assertFalse(result.isSuccess());
+        assertFalse(result.getStderr().isEmpty());
+    }
+
+    @Test
+    public void clearFlagWithExtraArg_returnsErrorAndHistoryUnchanged() {
+        session.getCommandHistory().add("cmd1");
+        CommandResult result = command.execute(session, new String[]{"-c", "extra"}, null);
+        assertFalse(result.isSuccess());
+        assertEquals(1, session.getCommandHistory().size());
+    }
+
+    @Test
+    public void limitZero_withEntries_returnsEmpty() {
+        session.getCommandHistory().add("cmd1");
+        session.getCommandHistory().add("cmd2");
+        CommandResult result = command.execute(session, new String[]{"0"}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("", result.getStdout());
+    }
 }

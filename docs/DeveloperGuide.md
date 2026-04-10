@@ -202,44 +202,11 @@ The shell parsing pipeline transforms the raw user input string like `echo hello
 
 **Parsing Pipeline Overview: (High Level)**
 
-```plantuml
-@startuml
-start
-:Receive raw input string;
-:Tokenize (char-by-char state machine);
-note right
-  States: NORMAL, IN_SINGLE_QUOTE, IN_DOUBLE_QUOTE
-  Recognizes: ||, >, >>, &&, ;
-end note
-:Split tokens into Segments;
-note right
-  Each Segment = commandName + args + optional redirect
-  Operators (PIPE, AND, SEMICOLON) separate segments
-end note
-:Build ParsedPlan;
-:Return ParsedPlan(segments, operators);
-stop
-@enduml
-```
+![Parsing Pipeline Activity Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ParsingPipelineActivity.puml)
+
 The `ShellParser.parse()` method runs the input through two stages: **tokenization**, then **plan building**
 
-The following object diagram shows a concrete `ParsedPlan` produced by parsing the input `echo hello | grep h > out.txt`:
-
-![ParsedPlan Object Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ParsedPlanObjectDiagram.puml)
-```plantuml
-@startuml
-hide footbox
-participant Caller
-participant ":ShellParser" as SP
-
-Caller -> SP : parse(input)
-SP -> SP : tokenize(input)
-note right : Char-by-char state machine.\nProduces a flat list of Tokens.
-SP -> SP : buildPlan(tokens)
-note right : Groups tokens into Segments\nseparated by operators.
-SP --> Caller : ParsedPlan
-@enduml
-```
+![Shell Parser Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ShellParserSequence.puml)
 
 #### Stage 1: Tokenization
 The tokenizer reads the input one character at a time using a state machine with three states:
@@ -251,7 +218,7 @@ The tokenizer reads the input one character at a time using a state machine with
 | `IN_DOUBLE_QUOTE` | All characters are literal until the closing `"`                                                                                                                                              |
 
 After tokenization, the token list is split into `Segment` objects at inter-segment operators (`PIPE`, `AND`, `SEMICOLON` , `OR`). 
-Within each segment, `REDIRECT` / `APPEND` tokens consume the next `WORD` token as the redirect target file.
+Within each segment, `REDIRECT` / `APPEND` / `INPUT_REDIRECT` tokens consume the next `WORD` token as the redirect target file.
 
 The parser handles two lookahead cases during tokenization in `NORMAL` state: `||` and `>>` are
 distinguished from `|` and `>` by peeking at the next character before emitting a token.
@@ -275,53 +242,18 @@ This means a plan with three segments always has exactly two operators connectin
 All parsing ultimately feeds into `runPlan()`, the core method that iterates the `ParsedPlan` and chains commands together. It is worth understanding its structure because most enhancements to the shell (new operators, alias resolution, input redirect) are implemented here.
 
 The engine tracks two pieces of state across iterations: `pipedStdin` (the stdout of the previous command, forwarded when the operator was `PIPE`) and `lastExitCode` (used to evaluate `&&` and `||` conditions). The loop processes one `Segment` per iteration:
-```plantuml
-@startuml
-hide footbox
-participant ":ShellSession" as SS
-participant ":CommandRegistry" as CR
-participant ":Command" as CMD
-participant ":VirtualFileSystem" as VFS
-participant ":UI" as UI
 
-loop for each Segment in ParsedPlan
+![Run Plan Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/RunPlanSequence.puml)
 
-  SS -> SS : check preceding operator
-  note right
-    skip if && failed or || passed
-  end note
+**Key Behaviours**
 
-  SS -> CR : get(commandName)
+**Redirect consumes stdout:** After a redirect, the result is replaced with an empty success.  
+  Example:  
+  `echo hello > file | grep h`  
+  → `grep` receives empty stdin (matching standard shell behaviour).
 
-  alt command found
-    SS -> CMD : execute(session, args, stdin)
-    CMD --> SS : CommandResult
-
-    alt segment has redirect
-      SS -> VFS : writeFile(target, stdout, append)
-      note right
-        stdout consumed by redirect
-      end note
-    end
-
-    note right
-      if next operator is PIPE →
-        forward stdout as stdin
-    end note
-
-  else command not found
-    SS -> SS : suggestCommand(commandName)
-    SS -> UI : println(error + suggestion)
-  end
-
-end
-@enduml
-```
-**Note: stdout consumed by a redirect is not forwarded to the next pipe stage**. <!--(This only applies when redirect is in the same segment)-->
-
-After a redirect, the result is replaced with an empty success, so a command like `echo hello > file | grep h` would give `grep` an empty stdin. This matches standard shell behaviour.
-
-The `shouldExit()` flag on `CommandResult` allows commands like `exit` to signal the REPL to stop, which `runPlan()` respects by setting `running = false` and breaking the loop immediately.
+**Exit propagation:** The `shouldExit()` flag on `CommandResult` causes `runPlan()` to set  
+  `running = false` and break the loop immediately.
 
 The following sequence diagram shows how `echo hello | grep h > output.txt` is executed:
 
