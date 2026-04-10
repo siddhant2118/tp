@@ -122,7 +122,7 @@ public class IntegrationTest {
         vfs.writeFile("/data.txt", "/", "one\ntwo\nthree", false);
         CommandResult result = session.executeOnce("cat /data.txt | wc -l");
         assertTrue(result.isSuccess());
-        assertEquals("2", result.getStdout().trim());
+        assertEquals("3", result.getStdout().trim());
     }
 
     @Test
@@ -131,7 +131,7 @@ public class IntegrationTest {
         vfs.writeFile("/data.txt", "/", "banana\napple\nbanana\napple\ncherry", false);
         CommandResult result = session.executeOnce("cat /data.txt | sort | uniq");
         assertTrue(result.isSuccess());
-        assertEquals("apple\nbanana\ncherry", result.getStdout());
+        assertEquals("apple\nbanana\ncherry", result.getStdout().stripTrailing());
     }
 
     @Test
@@ -140,7 +140,7 @@ public class IntegrationTest {
         vfs.writeFile("/data.txt", "/", "error: file not found\nok\nerror: permission\nok", false);
         CommandResult result = session.executeOnce("cat /data.txt | grep error | wc -l");
         assertTrue(result.isSuccess());
-        assertEquals("1", result.getStdout().trim());
+        assertEquals("2", result.getStdout().trim());
     }
 
     // ─── Redirect Workflows ─────────────────────────────────────
@@ -583,7 +583,7 @@ public class IntegrationTest {
         CommandResult result = session.executeOnce(
                 "cat /tmp/source.txt | sort | uniq | head -n 10 | wc -l");
         assertTrue(result.isSuccess());
-        assertEquals("9", result.getStdout().trim());
+        assertEquals("10", result.getStdout().trim());
     }
 
     @Test
@@ -628,7 +628,7 @@ public class IntegrationTest {
         }
         CommandResult result = session.executeOnce("ls /tmp/manyfiles | wc -l");
         assertTrue(result.isSuccess());
-        assertEquals("99", result.getStdout().trim());
+        assertEquals("100", result.getStdout().trim());
     }
 
     @Test
@@ -640,7 +640,7 @@ public class IntegrationTest {
             assertTrue(r.isSuccess(), "Command " + i + " should succeed");
         }
         CommandResult count = session.executeOnce("ls /tmp/seq | wc -l");
-        assertEquals("49", count.getStdout().trim());
+        assertEquals("50", count.getStdout().trim());
     }
 
     @Test
@@ -841,7 +841,7 @@ public class IntegrationTest {
             assertTrue(r.isSuccess(), "Command " + i + " should succeed");
         }
         CommandResult count = session.executeOnce("ls /tmp/stress200 | wc -l");
-        assertEquals("199", count.getStdout().trim());
+        assertEquals("200", count.getStdout().trim());
     }
 
     // ─── Edge Case: Special Characters in Filenames ─────────────
