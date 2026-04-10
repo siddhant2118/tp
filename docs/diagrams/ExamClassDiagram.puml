@@ -59,10 +59,27 @@ class ExamSession {
     - questionBank : QuestionBank
     - ui : Ui
     - vfsFactory : Supplier<VFS>
+    - questionInteraction : QuestionInteraction
+    - randomQuestionMode : RandomQuestionMode
     + startInteractive()
     + startWithArgs(topic, count, random)
     + runOneRandom()
     + listTopics()
+    - handlePracQuestion(q) : boolean
+}
+
+class QuestionInteraction {
+    - ui : Ui
+    + presentQuestionWithResult(q, index, total, result)
+    + presentSingleQuestion(q, index, total) : boolean
+}
+
+class RandomQuestionMode {
+    - questionBank : QuestionBank
+    - ui : Ui
+    - interaction : QuestionInteraction
+    - pracHandler : PracHandler
+    + runOneRandom()
 }
 
 class QuestionBank {
@@ -82,8 +99,11 @@ class ExamResult {
 
 ExamSession --> QuestionBank : queries
 ExamSession --> ExamResult : accumulates
+ExamSession --> QuestionInteraction : delegates
+ExamSession --> RandomQuestionMode : delegates
 ExamSession ..> ShellSession : creates temp\n(for PRAC)
 QuestionBank --> "*" Question : stores
+RandomQuestionMode --> QuestionInteraction : uses
 PracQuestion --> "*" Checkpoint : verified by
 Question --> QT
 Question --> QD

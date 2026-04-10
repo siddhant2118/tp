@@ -2,6 +2,7 @@
 actor User
 participant ":ExamSession" as ES
 participant ":QuestionBank" as QB
+participant ":QuestionInteraction" as QI
 participant ":Ui" as UI
 participant ":ExamResult" as ER
 
@@ -10,10 +11,10 @@ ES -> QB : getTopics()
 ES -> ES : listTopics()
 activate ES
 deactivate ES
-ES -> UI : readLine("Select topic: ")
+ES -> UI : readLine("Select topic\n(number or name): ")
 UI --> ES : topicSelection
 
-ES -> UI : readLine("How many questions?")
+ES -> UI : readLine("How many questions?\n(1-N, default: all): ")
 UI --> ES : countInput
 
 ES -> QB : getQuestions(topic, count, false)
@@ -21,13 +22,14 @@ QB --> ES : questions
 
 loop for each question
     alt MCQ or FITB
-        ES -> UI : println(question.present())
-        ES -> UI : readLine("Your answer: ")
-        UI --> ES : userAnswer
-        ES -> ES : question.checkAnswer(userAnswer)
-        activate ES
-        deactivate ES
-        ES -> ER : addResult(question, answer, correct)
+        ES -> QI : presentQuestionWithResult(q, index, total, result)
+        QI -> UI : println(question.present())
+        QI -> UI : readLine("Your answer: ")
+        UI --> QI : userAnswer
+        QI -> QI : question.checkAnswer(userAnswer)
+        activate QI
+        deactivate QI
+        QI -> ER : addResult(question, answer, correct)
     else PRAC
         ES -> ES : handlePracQuestion(q)
         activate ES

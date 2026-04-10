@@ -105,7 +105,7 @@ The CLI component consists of two classes: `Ui` and `MainParser`.
 
 ![CLI Class Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/CliClassDiagram.puml)
 
-**`Ui`** is the single point of contact for all user-facing I/O. It wraps `Scanner` for input and `PrintStream` for output. All components use `Ui` instead of directly calling `System.in`/`System.out`, making testing easier (injectable streams).
+**`Ui`** is the single point of contact for all user-facing I/O. It wraps `Scanner` for input and `PrintStream` for output and error streams. All components use `Ui` instead of directly calling `System.in`/`System.out`/`System.err`, making testing easier (injectable streams).
 
 **`MainParser`** implements the top-level REPL loop. It reads user input and dispatches to one of: `shell` (enter Shell Simulator), `exam` (start an exam), `exec` (one-shot shell command), `help`, or `exit`/`quit`.
 
@@ -115,7 +115,7 @@ The CLI component consists of two classes: `Ui` and `MainParser`.
 
 The Shell component handles command parsing, execution, and the interactive REPL. It is the largest component in LinuxLingo.
 
-The following class diagram shows the key classes. For clarity, only representative command implementations are shown; the full set of 36 commands follows the same `Command` interface.
+The following class diagram shows the key classes. For clarity, only representative command implementations are shown; the full set of 35 commands follows the same `Command` interface.
 
 ![Shell Class Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ShellClassDiagram.puml)
 
@@ -124,9 +124,10 @@ The Shell component:
 - Uses `ShellParser` to tokenize and parse raw input into a `ParsedPlan` (a list of `Segment` objects connected by operators).
 - `ShellSession` iterates through segments, looking up each command name in `CommandRegistry`, executing them, and chaining results via pipes, `&&`, `||`, or `;`.
 - Before command lookup, `ShellSession` resolves aliases, expands combined flags (e.g., `-la` → `-l -a`), expands glob patterns against the VFS, and expands shell variables (`$USER`, `$HOME`, `$PWD`).
+- `ShellLineReader` and `ShellCompleter` provide JLine-based tab-completion and command history support for the interactive shell.
 - Each `Command` implementation receives the current `ShellSession` (for VFS access and session state), parsed arguments, and optional piped stdin. It returns a `CommandResult` containing stdout, stderr, and an exit code.
 
-**Supported commands (36 total):**
+**Supported commands (35 total):**
 
 | Category | Commands |
 | -------- | -------- |
@@ -151,6 +152,8 @@ The Exam component:
 
 - `QuestionBank` loads question data files from `data/questions/` (via `QuestionParser`) and organizes them by topic.
 - `ExamSession` orchestrates exam sessions with three entry points: interactive mode, direct CLI args, and single-random-question mode.
+- `QuestionInteraction` handles all user interaction for non-PRAC questions: printing the question, reading the answer, showing feedback, and recording the outcome.
+- `RandomQuestionMode` handles the single-random-question mode: picks one random question from any topic and presents it.
 - Three question types are supported: `McqQuestion` (multiple choice), `FitbQuestion` (fill in the blank), and `PracQuestion` (practical — verified by checking VFS state against `Checkpoint` objects).
 - `ExamResult` tracks per-question outcomes and computes scores.
 
@@ -168,6 +171,7 @@ The Storage component:
 - `VfsSerializer` converts VFS snapshots to/from a custom `.env` text format, enabling users to save and load shell environments.
 - `QuestionParser` parses `.txt` question bank files into `Question` objects using a pipe-delimited format.
 - `ResourceExtractor` copies bundled question bank files from the JAR to `data/questions/` on first run.
+- `StorageException` is a checked exception thrown when a storage I/O operation fails, used by `Storage`, `VfsSerializer`, and other components.
 
 ---
 
@@ -199,8 +203,7 @@ This section describes some noteworthy details on how certain features are imple
 
 The shell parsing pipeline transforms the raw user input string like `echo hello | grep h > out.txt` into a structured execution plan (`ParsedPlan`) that the execution engine can act on. Understanding this pipeline is essential before working on any feature that involves parsing or command execution.
 
-
-**Parsing Pipeline Overview: (High Level)**
+#### Parsing Pipeline Overview: (High Level)
 
 ![Parsing Pipeline Activity Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ParsingPipelineActivity.puml)
 
@@ -209,15 +212,16 @@ The `ShellParser.parse()` method runs the input through two stages: **tokenizati
 ![Shell Parser Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ShellParserSequence.puml)
 
 #### Stage 1: Tokenization
+
 The tokenizer reads the input one character at a time using a state machine with three states:
 
-| State | Behaviour                                                                                                                                                                                     |
-|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `NORMAL` | Accumulates characters into tokens; whitespace flushes the current token.<br/> Special characters (` \| `, `>`, `>>`, `&&`, `;`) produce operator tokens. <br/>Quote characters switch state. |
-| `IN_SINGLE_QUOTE` | All characters are literal until the closing `'`                                                                                                                                              |
-| `IN_DOUBLE_QUOTE` | All characters are literal until the closing `"`                                                                                                                                              |
+| State | Behaviour |
+| --- | --- |
+| `NORMAL` | Accumulates characters into tokens; whitespace flushes the current token. Special characters (` \| `, `>`, `>>`, `&&`, `;`) produce operator tokens. Quote characters switch state. |
+| `IN_SINGLE_QUOTE` | All characters are literal until the closing `'` |
+| `IN_DOUBLE_QUOTE` | All characters are literal until the closing `"` |
 
-After tokenization, the token list is split into `Segment` objects at inter-segment operators (`PIPE`, `AND`, `SEMICOLON` , `OR`). 
+After tokenization, the token list is split into `Segment` objects at inter-segment operators (`PIPE`, `AND`, `SEMICOLON` , `OR`).
 Within each segment, `REDIRECT` / `APPEND` / `INPUT_REDIRECT` tokens consume the next `WORD` token as the redirect target file.
 
 The parser handles two lookahead cases during tokenization in `NORMAL` state: `||` and `>>` are
@@ -227,6 +231,7 @@ A lone `&` character (not followed by another `&`) is treated as a literal word 
 rather than an operator, which matches standard shell behaviour.
 
 #### Stage 2: Plan Building
+
 Once the flat token list is produced, `buildPlan()` walks through it and groups tokens into `Segment` objects. Each `Segment` holds a command name, its arguments, and optional redirect information. Operator tokens (`PIPE`, `AND`, `SEMICOLON`, `OR`) act as delimiters between segments and are recorded separately in the `operators` list.
 
 The parser maintains an `Expecting` flag to handle redirect targets: when a `REDIRECT` or `APPEND` token is seen, the very next `WORD` token is consumed as the redirect file path rather than as a command argument. The same pattern applies to `INPUT_REDIRECT` (`<`).
@@ -237,7 +242,7 @@ The result is a `ParsedPlan` with the following invariant, enforced by an assert
 
 This means a plan with three segments always has exactly two operators connecting them, making the execution engine's iteration straightforward.
 
-**Execution engine (`ShellSession.runPlan()`):**
+#### Execution engine (`ShellSession.runPlan()`)
 
 All parsing ultimately feeds into `runPlan()`, the core method that iterates the `ParsedPlan` and chains commands together. It is worth understanding its structure because most enhancements to the shell (new operators, alias resolution, input redirect) are implemented here.
 
@@ -245,7 +250,7 @@ The engine tracks two pieces of state across iterations: `pipedStdin` (the stdou
 
 ![Run Plan Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/RunPlanSequence.puml)
 
-**Key Behaviours**
+#### Key Behaviours
 
 **Redirect consumes stdout:** After a redirect, the result is replaced with an empty success.  
   Example:  
@@ -279,7 +284,7 @@ them, if no VFS paths match the pattern, the literal argument is passed through 
 
 ### Command Execution with Piping and Redirection
 
-All 36 commands follow the same implementation pattern:
+All 35 commands follow the same implementation pattern:
 
 1. Parse flags and arguments from `args[]`.
 2. Determine input source: file arguments take priority over piped `stdin`.
@@ -382,9 +387,9 @@ For practical questions, `ExamSession.handlePracQuestion()`:
 
 ### Exam Component — Practical Questions
 
-This section documents a planned enhancement to the Exam component’s practical (`PRAC`) questions: configurable VFS setup and richer checkpoint validation. The goal is to support more realistic, multi-step shell scenarios while keeping the public Exam API stable for the rest of the system.
+This section documents the configurable VFS setup and richer checkpoint validation features for practical (`PRAC`) questions. The goal is to support more realistic, multi-step shell scenarios while keeping the public Exam API stable for the rest of the system.
 
-The enhancement is implemented via two extensions:
+The feature is implemented via two extensions:
 
 1. `PracQuestion.SetupItem` — declarative VFS setup instructions applied before the user starts typing commands.
 2. Extended `Checkpoint` semantics — new node checks (`NOT_EXISTS`, `CONTENT_EQUALS`, `PERM`) to validate more aspects of the final VFS state.
@@ -398,36 +403,38 @@ These changes are internal to the exam module and transparent to callers such as
 At a high level, the flow for a `PRAC` question becomes:
 
 1. `ExamSession` creates a fresh `VirtualFileSystem` via `vfsFactory`.
-2. `ExamSession` asks the `PracQuestion` to apply any configured setup into that VFS.
+2. `ExamSession` asks the `PracQuestion` to apply any configured setup into that VFS (planned — `applySetup()` is implemented in `PracQuestion` but not yet called by `ExamSession`).
 3. `ExamSession` starts a temporary `ShellSession` over the prepared VFS and lets the user perform the task.
 4. When the user exits the shell, `PracQuestion.checkVfs()` verifies all `Checkpoint`s against the final VFS state.
 
-The enhancement is implemented by extending the existing `PracQuestion` and `Checkpoint` classes; no new top-level types are introduced.
+The feature is implemented by extending the existing `PracQuestion` and `Checkpoint` classes; no new top-level types are introduced.
 
 **Key classes (Exam sub-package):**
 
 - `PracQuestion` (in `linuxlingo.exam.question`)
-  - Already represents a practical question, with:
+  - Represents a practical question, with:
     - `List<Checkpoint> checkpoints`
     - `List<SetupItem> setupItems`
-  - Enhancement: implement `applySetup(VirtualFileSystem vfs)` using `setupItems`.
+  - `applySetup(VirtualFileSystem vfs)` is fully implemented using `setupItems`.
 
 - `PracQuestion.SetupItem` (inner static class)
-  - Already declared with:
+  - Declared with:
     - `SetupType` enum: `MKDIR`, `FILE`, `PERM`
     - Fields: `type`, `path`, `value`
-  - Enhancement: define concrete semantics for each `SetupType` and enforce them in `applySetup`.
+  - Concrete semantics for each `SetupType` are implemented in `applySetup`.
 
 - `Checkpoint` (in `linuxlingo.exam`)
-  - Already exposes `matches(VirtualFileSystem vfs)` and `NodeType` enum.
-  - Enhancement: implement additional `NodeType`s:
+  - Exposes `matches(VirtualFileSystem vfs)` and `NodeType` enum.
+  - Fully supports all `NodeType`s:
+    - `DIR` — assert that a directory exists.
+    - `FILE` — assert that a file exists.
     - `NOT_EXISTS` — assert that a path is absent.
     - `CONTENT_EQUALS` — assert file content equality.
     - `PERM` — assert file/dir permissions.
 
 - `ExamSession` (in `linuxlingo.exam`)
-  - Already orchestrates `PRAC` questions via `handlePracQuestion(PracQuestion q)`.
-  - Enhancement: call `q.applySetup(tempVfs)` before starting the `ShellSession`.
+  - Orchestrates `PRAC` questions via `handlePracQuestion(PracQuestion q)`.
+  - Planned: call `q.applySetup(tempVfs)` before starting the `ShellSession` (not yet wired).
 
 This keeps the public interface between modules unchanged: the CLI, Shell, and Storage components continue to treat the Exam module as a black box that exposes `ExamSession` and `QuestionBank` only.
 
@@ -446,6 +453,7 @@ This keeps the public interface between modules unchanged: the CLI, Shell, and S
 ---
 
 #### 4. Activity Diagram — Applying Setup Items
+
 ![PracQuestion Setup Activity Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/PracQuestionSetupActivity.puml)
 
 ---
@@ -460,7 +468,7 @@ This keeps the public interface between modules unchanged: the CLI, Shell, and S
   - Easy to generate from question bank text via `QuestionParser`.
   - Easy to reason about and test at the `PracQuestion` level.
 
-**Why extend `Checkpoint.NodeType`?**
+#### Why extend `Checkpoint.NodeType`?
 
 - Existing `DIR` and `FILE` checks only validate presence and node kind.
 - New types enable richer questions:
@@ -469,7 +477,7 @@ This keeps the public interface between modules unchanged: the CLI, Shell, and S
   - `PERM`: “Set the permission of this file to 755.”
 - This keeps the final-state validation declarative and human-readable in the question bank.
 
-**Alternative 1: Global VFS Templates**
+#### Alternative 1: Global VFS Templates
 
 One alternative was to define named “VFS templates” elsewhere (e.g., serialized trees stored by the Storage component), and let `PracQuestion` refer to them by ID.
 
@@ -481,7 +489,7 @@ One alternative was to define named “VFS templates” elsewhere (e.g., seriali
   - Makes individual questions harder to understand without looking up the template definition.
 - **Reason rejected:** For this project scale, per-question declarative setup keeps the exam bank self-contained and easier for new contributors to maintain.
 
-**Alternative 2: Hard-coded Setup per Question**
+#### Alternative 2: Hard-coded Setup per Question
 
 Another option was to provide a dedicated subclass or factory per practical question that mutates the VFS imperatively.
 
@@ -504,7 +512,7 @@ Another option was to provide a dedicated subclass or factory per practical ques
   - Only observable difference is that the initial VFS contents for a `PRAC` question may now be non-empty.
 
 - **Storage Component**
-  - `QuestionParser` will parse additional fields for `PRAC` question setup, constructing the appropriate `SetupItem` instances.
+  - `QuestionParser` parses additional fields for `PRAC` question setup, constructing the appropriate `SetupItem` instances.
   - No changes are required in `Storage` itself.
 
 - **Testing**
@@ -529,13 +537,13 @@ This design leaves room for future growth:
 ### Question Parsing and Loading
 
 Question bank files use a pipe-delimited format. `QuestionParser` processes each line into typed `Question` objects.
-The question bank parsing feature is implemented by QuestionParser, which reads plain-text .txt files from the data/questions directory via Storage.readLines(Path) and converts each non-comment, non-blank line into a concrete Question object. 
-Each line is pipe-delimited into up to six fields: TYPE | DIFFICULTY | QUESTION_TEXT | ANSWER | OPTIONS | EXPLANATION. 
+The question bank parsing feature is implemented by QuestionParser, which reads plain-text .txt files from the data/questions directory via Storage.readLines(Path) and converts each non-comment, non-blank line into a concrete Question object.
+Each line is pipe-delimited into up to six fields: TYPE | DIFFICULTY | QUESTION_TEXT | ANSWER | OPTIONS | EXPLANATION.
 QuestionParser normalises the type and difficulty (defaulting invalid difficulty values to MEDIUM), then dispatches to parseMcq, parseFitb, or parsePrac based on the TYPE field.
-MCQ options are parsed into a LinkedHashMap<Character, String> to preserve display order, FITB answers are split on unescaped | (with \| treated as a literal pipe), and PRAC answers are currently parsed into simple Checkpoint objects, with a v2.0 hook for optional setup items. 
-Malformed lines are skipped with a logged warning instead of failing the entire file, and an assertion ensures that the resulting question list contains no null entries. 
-We chose a pipe-separated text format instead of JSON/YAML to keep the files compact, easy to edit, and diff-friendly for contributors. 
-Alternatives such as embedding questions directly in Java code or using a more complex DSL were rejected because they would make non-developer contributions harder and tightly couple content with implementation; 
+MCQ options are parsed into a LinkedHashMap<Character, String> to preserve display order, FITB answers are split on unescaped | (with \| treated as a literal pipe), and PRAC answers are parsed into Checkpoint objects supporting both basic types (`DIR`, `FILE`) and extended types (`NOT_EXISTS`, `CONTENT_EQUALS`, `PERM`), with optional setup items parsed from the OPTIONS field.
+Malformed lines are skipped with a logged warning instead of failing the entire file, and an assertion ensures that the resulting question list contains no null entries.
+We chose a pipe-separated text format instead of JSON/YAML to keep the files compact, easy to edit, and diff-friendly for contributors.
+Alternatives such as embedding questions directly in Java code or using a more complex DSL were rejected because they would make non-developer contributions harder and tightly couple content with implementation;
 the current design keeps parsing logic centralized in QuestionParser and lets the rest of the exam module work purely with typed Question objects.
 **Data flow:**
 
@@ -549,7 +557,7 @@ TYPE | DIFFICULTY | QUESTION_TEXT | ANSWER | OPTIONS | EXPLANATION
 
 - **MCQ** answer: single letter (e.g., `B`). Options: `A:text B:text C:text D:text`.
 - **FITB** answer: accepted answers separated by `|` (e.g., `pwd|PWD`). Escaped pipes (`\|`) are treated as literal pipe characters.
-- **PRAC** answer: checkpoints as `path:TYPE` pairs (e.g., `/home/project:DIR,/home/readme.txt:FILE`). Optional setup items in the OPTIONS field (semicolon-separated).
+- **PRAC** answer: checkpoints as `path:TYPE` pairs (e.g., `/home/project:DIR,/home/readme.txt:FILE`). Supported types: `DIR`, `FILE`, `NOT_EXISTS`, `CONTENT_EQUALS=value`, `PERM=rwxr-xr-x`. Optional setup items in the OPTIONS field (semicolon-separated).
 
 ---
 
@@ -737,8 +745,8 @@ LinuxLingo provides an interactive Linux shell simulator combined with a quiz sy
 
 13. **Command history**
     - Run a few commands, then `history` → numbered list of previous commands
-    - `!!` → re-runs the last command
-    - `!3` → re-runs command number 3
+    - `history 3` → shows the last 3 commands
+    - `history -c` → clears the command history
 
 14. **Info commands**
     - `man ls` → displays usage info for `ls`
@@ -749,8 +757,8 @@ LinuxLingo provides an interactive Linux shell simulator combined with a quiz sy
     - `echo "hello" | tee /tmp/tee.txt` → prints `hello` AND writes it to `/tmp/tee.txt`
 
 16. **Command suggestion**
-    - `mkdi` → `Did you mean: mkdir?`
-    - `gre` → `Did you mean: grep?`
+    - `mkdi` → `mkdi: command not found` followed by `Did you mean 'mkdir'?`
+    - `gre` → `gre: command not found` followed by `Did you mean 'grep'?`
 
 17. **Exiting the shell**
     - `exit` → returns to `linuxlingo>` prompt

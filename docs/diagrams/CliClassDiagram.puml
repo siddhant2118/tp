@@ -5,6 +5,7 @@ class Ui {
     - err : PrintStream
     + readLine() : String
     + readLine(prompt) : String
+    + print(message)
     + println(message)
     + printError(message)
     + printWelcome()

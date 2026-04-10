@@ -5,11 +5,13 @@ class Storage {
     + {static} readFile(path) : String
     + {static} readLines(path) : List<String>
     + {static} writeFile(path, content)
+    + {static} appendFile(path, content)
     + {static} exists(path) : boolean
     + {static} delete(path) : boolean
     + {static} listFiles(dir, ext) : List<Path>
     + {static} ensureDirectory(dir)
     + {static} getDataDir() : Path
+    + {static} getDataSubDir(sub) : Path
 }
 
 class VfsSerializer {

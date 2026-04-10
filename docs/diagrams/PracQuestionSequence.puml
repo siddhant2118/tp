@@ -12,13 +12,19 @@ note right of VFS : Create fresh VFS
 ES -> PQ : hasSetup()
 PQ --> ES : true
 
-ES -> PQ : applySetup(tempVfs)
-note right of PQ
-  For each SetupItem:
-    MKDIR → createDirectory
-    FILE  → createFile + write content
-    PERM  → setPermission
+note right of ES
+  **Planned (not yet wired):**
+  applySetup(tempVfs) is implemented
+  in PracQuestion but not yet called
+  by ExamSession.
 end note
+' ES -> PQ : applySetup(tempVfs)
+' note right of PQ
+'   For each SetupItem:
+'     MKDIR → createDirectory
+'     FILE  → createFile + write content
+'     PERM  → setPermission
+' end note
 
 ES -> SS ** : new ShellSession(tempVfs, ui)
 ES -> UI : println(question text)

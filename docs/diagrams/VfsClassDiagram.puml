@@ -16,6 +16,8 @@ class Directory extends FileNode {
     + removeChild(name)
     + getChild(name) : FileNode
     + getChildren() : List<FileNode>
+    + hasChild(name) : boolean
+    + isEmpty() : boolean
 }
 
 class RegularFile extends FileNode {
@@ -32,12 +34,17 @@ class Permission {
     + {static} fromSymbolic(symbolic, current) : Permission
     + canOwnerRead() : boolean
     + canOwnerWrite() : boolean
+    + canOwnerExecute() : boolean
     + toString() : String
+    + toOctal() : String
+    + copy() : Permission
 }
 
 class VirtualFileSystem {
     - root : Directory
     + resolve(path, workingDir) : FileNode
+    + resolveParent(path, workingDir) : Directory
+    + getBaseName(path, workingDir) : String
     + createFile(...) : RegularFile
     + createDirectory(...) : Directory
     + delete(...)
@@ -47,7 +54,11 @@ class VirtualFileSystem {
     + writeFile(...)
     + listDirectory(...) : List<FileNode>
     + findByName(...) : List<FileNode>
+    + exists(path, workingDir) : boolean
+    + getAbsolutePath(path, workingDir) : String
+    + getRoot() : Directory
     + deepCopy() : VirtualFileSystem
+    + {static} matchesWildcard(pattern, name) : boolean
 }
 
 class VfsException extends RuntimeException

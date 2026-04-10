@@ -185,8 +185,8 @@ Lists the contents of a directory.
 
 Format: `ls [-a] [-l] [-R] [DIRECTORY...]`
 
-- `-a` -- show all files, including hidden files (names starting with `.`).
-- `-l` -- use long listing format, showing file type, permissions, size, and name.
+- `-a` -- show all files, including hidden files (names starting with `.`). Note: `.` and `..` pseudo-entries are not displayed.
+- `-l` -- use long listing format, showing file type, permissions, link count, owner, group, size, and name.
 - `-R` -- list subdirectories recursively.
 - If no directory is given, lists the current directory.
 
@@ -194,19 +194,17 @@ Examples:
 
 ```text
 user@linuxlingo:/$ ls
-etc/
 home/
 tmp/
+etc/
 
 user@linuxlingo:/$ ls -l /home
-drwxr-xr-x  0  user/
+drwxr-xr-x  1 user user  0  user/
 
 user@linuxlingo:/$ ls -a
-./
-../
-etc/
 home/
 tmp/
+etc/
 ```
 
 ---
@@ -261,7 +259,7 @@ Prints text to the terminal. Often used with redirection to write to files.
 Format: `echo [-n] [-e] [TEXT...]`
 
 - `-n` -- do not output a trailing newline.
-- `-e` -- interpret backslash escape sequences (`\n`, `\t`, `\\`).
+- `-e` -- interpret backslash escape sequences (`\n`, `\t`, `\\`, `\a`, `\b`).
 
 Examples:
 
@@ -288,25 +286,30 @@ Examples:
 
 Copies files or directories.
 
-Format: `cp [-r] SOURCE DESTINATION`
+Format: `cp [-r] SOURCE [SOURCE...] DESTINATION`
 
 - `-r` -- copy directories recursively.
+- When copying multiple sources, the destination must be an existing directory.
 
 Examples:
 
 - `cp file.txt backup.txt` -- copy a file.
 - `cp -r src/ src_backup/` -- copy a directory.
+- `cp file1.txt file2.txt docs/` -- copy multiple files into a directory.
 
 #### Moving or renaming files: `mv`
 
 Moves or renames files and directories.
 
-Format: `mv SOURCE DESTINATION`
+Format: `mv SOURCE [SOURCE...] DESTINATION`
+
+- When moving multiple sources, the destination must be an existing directory.
 
 Examples:
 
 - `mv old_name.txt new_name.txt` -- rename a file.
 - `mv file.txt /home/user/docs/` -- move a file to another directory.
+- `mv file1.txt file2.txt docs/` -- move multiple files into a directory.
 
 #### Comparing files: `diff`
 
@@ -351,9 +354,10 @@ hello
 
 Displays the first N lines of a file (default: 10). Supports multiple files and piped input.
 
-Format: `head [-n COUNT] [FILE...]`
+Format: `head [-n COUNT] [-COUNT] [FILE...]`
 
 - `-n COUNT` -- number of lines to display. A negative value (e.g., `-n -3`) displays all lines except the last 3.
+- `-COUNT` -- legacy shorthand for `-n COUNT` (e.g., `head -5 file.txt` is the same as `head -n 5 file.txt`).
 - When multiple files are given, each file's output is preceded by a `==> filename <==` header.
 
 Examples:
@@ -365,9 +369,10 @@ Examples:
 
 Displays the last N lines of a file (default: 10). Supports multiple files and piped input.
 
-Format: `tail [-n COUNT] [FILE...]`
+Format: `tail [-n COUNT] [-COUNT] [FILE...]`
 
 - `-n COUNT` -- number of lines from the end. Use `-n +N` to output starting from line N.
+- `-COUNT` -- legacy shorthand for `-n COUNT` (e.g., `tail -5 file.txt` is the same as `tail -n 5 file.txt`).
 - When multiple files are given, each file's output is preceded by a `==> filename <==` header.
 
 Example:
@@ -386,6 +391,8 @@ Format: `grep [-i] [-v] [-n] [-c] [-l] [-E] PATTERN [FILE...]`
 - `-c` -- only print a count of matching lines.
 - `-l` -- only list the names of files containing matches.
 - `-E` -- interpret PATTERN as an extended regular expression.
+
+> [Note] **Note:** By default, `grep` performs literal substring matching. Use `-E` to enable regular expression matching.
 
 Examples:
 
@@ -518,13 +525,13 @@ Example:
 ```text
 user@linuxlingo:/$ man grep
 NAME
-    grep - Search for lines matching a pattern
+    grep - Search for pattern in file (use -E for regex)
 
 SYNOPSIS
-    grep [-E] [-i] [-v] [-n] [-c] [-l] PATTERN [FILE...]
+    grep [-E] [-i] [-v] [-n] [-c] [-l] <pattern> [file...]
 
 DESCRIPTION
-    Search for lines matching a pattern
+    Search for pattern in file (use -E for regex)
 ```
 
 #### Displaying a directory tree: `tree`
@@ -538,7 +545,7 @@ Example:
 ```text
 user@linuxlingo:/$ tree /home
 home
-+-- user
+└── user
 
 1 directories, 0 files
 ```
@@ -601,13 +608,10 @@ user@linuxlingo:/$ ll
 > [Note] **Note:** Quotes are required when the alias value contains spaces.
 > `alias ll='ls -la'` works correctly; `alias ll=ls -la` will only alias `ll` to `ls`,
 > silently ignoring `-la`.
-
 > [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts. *(Coming soon: persistent aliases across sessions.)*
-
 > [Tip] **Tip:** Combined single-character flags like `-la` are automatically expanded to `-l -a` before the command runs, so both forms are accepted.
-
 > [Tip] **Tip:** Aliases can chain, if `ll` is aliased to `ls -la` and `ls` is aliased to another command, LinuxLingo will follow the chain automatically. Circular aliases are detected and stopped safely.
-> 
+
 #### Removing aliases: `unalias`
 
 Removes one or more command aliases.
@@ -640,7 +644,7 @@ user@linuxlingo:/$ history
 ```
 
 ---
-> [Note] **Note:** Every command you enter is recorded in history, including commands that fail or produce errors. History resets when you leave the Shell Simulator.
+> [Note] **Note:** Every command you enter is recorded in history, including commands that fail or produce errors. The `history` command itself is not recorded (mimics bash behaviour). History resets when you leave the Shell Simulator.
 
 `history 0` shows no output (not an error). *(Coming soon: improved validation with an informative message for invalid counts.)*
 
@@ -862,7 +866,7 @@ Format: `exam`
 
 - Prompts you to select a topic by number or name.
 - Prompts for the number of questions (press Enter for all questions in the topic).
-- Shows feedback ([Correct] / [Incorrect] and explanation) after each question.
+- Shows feedback (✓ Correct! / ✗ Incorrect. and explanation) after each question.
 - Shows a final score summary at the end.
 
 > [Tip] **Tip:** Type `quit` to skip a question during an exam.
@@ -994,12 +998,12 @@ A: Aliases only persist for the current shell session. You will need to redefine
 | `cat` | `cat [-n] FILE...` | Display file contents |
 | `echo` | `echo [-n] [-e] [TEXT...]` | Print text |
 | `rm` | `rm [-r] [-f] FILE...` | Remove files/directories |
-| `cp` | `cp [-r] SOURCE DEST` | Copy files/directories |
-| `mv` | `mv SOURCE DEST` | Move/rename files |
+| `cp` | `cp [-r] SOURCE... DEST` | Copy files/directories |
+| `mv` | `mv SOURCE... DEST` | Move/rename files |
 | `diff` | `diff FILE1 FILE2` | Compare two files line by line |
 | `tee` | `tee [-a] FILE...` | Read stdin and write to files |
-| `head` | `head [-n COUNT] [FILE...]` | Display first N lines |
-| `tail` | `tail [-n COUNT] [FILE...]` | Display last N lines |
+| `head` | `head [-n COUNT] [-COUNT] [FILE...]` | Display first N lines |
+| `tail` | `tail [-n COUNT] [-COUNT] [FILE...]` | Display last N lines |
 | `grep` | `grep [-i] [-v] [-n] [-c] [-l] [-E] PATTERN [FILE...]` | Search for pattern |
 | `find` | `find [DIR] [-name PATTERN] [-type TYPE] [-size SIZE]` | Find files by name/type/size |
 | `wc` | `wc [-l] [-w] [-c] [FILE...]` | Count lines/words/chars |

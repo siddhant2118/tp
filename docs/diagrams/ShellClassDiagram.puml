@@ -15,6 +15,8 @@ class CommandResult {
     + {static} success(stdout) : CommandResult
     + {static} error(stderr) : CommandResult
     + {static} exit() : CommandResult
+    + {static} of(stdout, stderr, exitCode, shouldExit) : CommandResult
+    + isSuccess() : boolean
 }
 
 class ShellParser {
@@ -78,6 +80,6 @@ CdCommand ..|> Command
 LsCommand ..|> Command
 GrepCommand ..|> Command
 AliasCommand ..|> Command
-note "32 more command\nimplementations..." as N1
+note "31 more command\nimplementations..." as N1
 N1 .. CdCommand
 @enduml
