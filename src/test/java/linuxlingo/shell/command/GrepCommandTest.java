@@ -331,4 +331,42 @@ public class GrepCommandTest {
     public void grep_getDescription_notEmpty() {
         assertFalse(command.getDescription().isEmpty());
     }
+
+    @Test
+    public void grep_countNoMatchStillReturnsZero() {
+        String[] args = {"-c", "orange", "data.txt"};
+        CommandResult result = command.execute(session, args, null);
+
+        assertTrue(result.isSuccess());
+        assertEquals("0", result.getStdout());
+    }
+
+    @Test
+    public void grep_countMultiFileIncludesZeroMatches() {
+        vfs.createFile("/home/user/one.txt", "/");
+        vfs.writeFile("/home/user/one.txt", "/", "apple", false);
+        vfs.createFile("/home/user/two.txt", "/");
+        vfs.writeFile("/home/user/two.txt", "/", "banana", false);
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session,
+                new String[]{"-c", "apple", "one.txt", "two.txt"}, null);
+
+        assertTrue(result.isSuccess());
+        assertTrue(result.getStdout().contains("one.txt:1"));
+        assertTrue(result.getStdout().contains("two.txt:0"));
+    }
+
+    @Test
+    public void grep_doubleDash_treatsDashPrefixedPatternLiterally() {
+        vfs.createFile("/home/user/-file", "/");
+        vfs.writeFile("/home/user/-file", "/", "hello", false);
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session,
+                new String[]{"--", "hello", "-file"}, null);
+
+        assertTrue(result.isSuccess());
+        assertEquals("hello", result.getStdout());
+    }
 }

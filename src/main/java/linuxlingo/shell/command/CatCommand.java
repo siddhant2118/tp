@@ -20,10 +20,13 @@ public class CatCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean numberLines = false;
+        boolean endOfOptions = false;
         List<String> files = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-n")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-n")) {
                 numberLines = true;
             } else {
                 files.add(arg);

@@ -57,6 +57,9 @@ public class ShellSession {
             "name", "type", "size", "exec", "perm", "path",
             "help", "sort", "file", "count"
     );
+        private static final java.util.Set<String> SUSPICIOUS_REDIRECT_ARGS = java.util.Set.of(
+            "then", "do", "done", "fi", "else", "elif"
+        );
 
     private VirtualFileSystem vfs;
     private String workingDir;
@@ -122,6 +125,10 @@ public class ShellSession {
 
             // null signals end of piped test input
             if (input == null) {
+                if (lineReader != null && !lineReader.lastReadReachedEof()) {
+                    ui.println("Input error. Please try again.");
+                    continue;
+                }
                 running = false;
                 break;
             }
@@ -305,6 +312,11 @@ public class ShellSession {
             if (!result.getStderr().isEmpty()) {
                 appendToOrderedOutput(orderedOutput, result.getStderr());
                 appendToAccumulator(accumulatedStderr, result.getStderr());
+            }
+
+            for (String warning : detectSuspiciousRedirectWarnings(segment)) {
+                appendToOrderedOutput(orderedOutput, warning);
+                appendToAccumulator(accumulatedStderr, warning);
             }
 
             result = applyOutputRedirect(segment, result);
@@ -495,6 +507,20 @@ public class ShellSession {
     private Command resolveCommand(String rawName) {
         String resolvedName = resolveAlias(rawName, new ArrayList<>());
         return registry.get(resolvedName);
+    }
+
+    private List<String> detectSuspiciousRedirectWarnings(ShellParser.Segment segment) {
+        List<String> warnings = new ArrayList<>();
+        if (segment.redirect == null) {
+            return warnings;
+        }
+
+        for (String arg : segment.args) {
+            if (SUSPICIOUS_REDIRECT_ARGS.contains(arg)) {
+                warnings.add("warning: '" + arg + "' is not a command separator, treated as argument");
+            }
+        }
+        return warnings;
     }
 
     /**

@@ -103,4 +103,19 @@ public class TouchCommandTest {
     public void touch_getDescription_notEmpty() {
         assertFalse(command.getDescription().isEmpty());
     }
+
+    @Test
+    public void touch_emptyString_returnsError() {
+        CommandResult result = command.execute(session, new String[]{""}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("invalid file name"));
+    }
+
+    @Test
+    public void touch_doubleDash_allowsDashPrefixedName() {
+        session.setWorkingDir("/home/user");
+        CommandResult result = command.execute(session, new String[]{"--", "-file"}, null);
+        assertTrue(result.isSuccess());
+        assertTrue(vfs.exists("/home/user/-file", "/"));
+    }
 }

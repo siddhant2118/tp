@@ -17,9 +17,11 @@ class QuestionInteraction {
     private static final Logger LOGGER = Logger.getLogger(QuestionInteraction.class.getName());
 
     private final Ui ui;
+    private boolean examAborted;
 
     QuestionInteraction(Ui ui) {
         this.ui = Objects.requireNonNull(ui, "ui must not be null");
+        this.examAborted = false;
     }
 
     /**
@@ -34,15 +36,20 @@ class QuestionInteraction {
      * Present a non-PRAC question as part of an exam run and record the
      * result in the given {@link ExamResult}.
      */
-    void presentQuestionWithResult(Question question, int index, int total, ExamResult result) {
+    boolean presentQuestionWithResult(Question question, int index, int total, ExamResult result) {
         Objects.requireNonNull(question, "question must not be null");
         Objects.requireNonNull(result, "result must not be null");
 
         String userAnswer = askQuestion(question, index, total);
+        if (userAnswer != null && userAnswer.trim().equalsIgnoreCase("abort")) {
+            examAborted = true;
+            ui.println("Exam aborted.");
+            return false;
+        }
         if (userAnswer == null || userAnswer.trim().equalsIgnoreCase("quit")) {
             LOGGER.log(Level.FINE, "Question skipped by user at index {0}", index);
             result.addResult(question, "", false);
-            return;
+            return true;
         }
 
         boolean correct = question.checkAnswer(userAnswer);
@@ -53,6 +60,7 @@ class QuestionInteraction {
         }
         ui.println("Explanation: " + question.getExplanation());
         result.addResult(question, userAnswer, correct);
+        return true;
     }
 
     /**
@@ -81,6 +89,14 @@ class QuestionInteraction {
         }
         ui.println("Explanation: " + question.getExplanation());
         return correct;
+    }
+
+    void resetAbort() {
+        examAborted = false;
+    }
+
+    boolean isExamAborted() {
+        return examAborted;
     }
 }
 

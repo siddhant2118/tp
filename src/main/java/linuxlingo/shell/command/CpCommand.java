@@ -17,12 +17,15 @@ public class CpCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean recursive = false;
+        boolean endOfOptions = false;
         List<String> paths = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-r")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-r")) {
                 recursive = true;
-            } else if (!arg.startsWith("-")) {
+            } else if (endOfOptions || !arg.startsWith("-")) {
                 paths.add(arg);
             }
         }
@@ -40,6 +43,10 @@ public class CpCommand implements Command {
             }
             for (int i = 0; i < paths.size() - 1; i++) {
                 try {
+                    CommandResult validationError = validateCopy(session, paths.get(i), dest);
+                    if (validationError != null) {
+                        return validationError;
+                    }
                     session.getVfs().copy(paths.get(i), dest, session.getWorkingDir(), recursive);
                 } catch (VfsException e) {
                     return CommandResult.error("cp: " + e.getMessage());
@@ -49,18 +56,61 @@ public class CpCommand implements Command {
         }
 
         try {
-            // Detect copying a file to itself
-            String absSrc = session.getVfs().getAbsolutePath(paths.get(0), session.getWorkingDir());
-            String absDest = session.getVfs().getAbsolutePath(paths.get(1), session.getWorkingDir());
-            if (absSrc.equals(absDest)) {
-                return CommandResult.error("cp: '" + paths.get(0) + "' and '" + paths.get(1)
-                        + "' are the same file");
+            CommandResult validationError = validateCopy(session, paths.get(0), paths.get(1));
+            if (validationError != null) {
+                return validationError;
             }
             session.getVfs().copy(paths.get(0), paths.get(1), session.getWorkingDir(), recursive);
             return CommandResult.success("");
         } catch (VfsException e) {
             return CommandResult.error("cp: " + e.getMessage());
         }
+    }
+
+    private CommandResult validateCopy(ShellSession session, String srcPath, String destPath) {
+        String absSrc = session.getVfs().getAbsolutePath(srcPath, session.getWorkingDir());
+        String absDest = session.getVfs().getAbsolutePath(destPath, session.getWorkingDir());
+        if (absSrc.equals(absDest)) {
+            return CommandResult.error("cp: '" + srcPath + "' and '" + destPath + "' are the same file");
+        }
+
+        try {
+            var srcNode = session.getVfs().resolve(srcPath, session.getWorkingDir());
+            var destNode = session.getVfs().resolve(destPath, session.getWorkingDir());
+            if (srcNode.isDirectory() && destNode.isDirectory()) {
+                String finalDest = "/".equals(absSrc)
+                        ? absDest
+                        : absDest + (absDest.endsWith("/") ? "" : "/") + srcNode.getName();
+                if (isSameOrDescendant(finalDest, absSrc)) {
+                    return CommandResult.error("cp: cannot copy a directory, '" + srcPath
+                            + "', into itself, '" + destPath + "'");
+                }
+            }
+        } catch (VfsException e) {
+            // Destination may not exist yet; fall through to raw-path validation below.
+        }
+
+        if (isSameOrDescendant(absDest, absSrc)) {
+            try {
+                if (session.getVfs().resolve(srcPath, session.getWorkingDir()).isDirectory()) {
+                    return CommandResult.error("cp: cannot copy a directory, '" + srcPath
+                            + "', into itself, '" + destPath + "'");
+                }
+            } catch (VfsException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private boolean isSameOrDescendant(String path, String ancestor) {
+        if (path.equals(ancestor)) {
+            return true;
+        }
+        if ("/".equals(ancestor)) {
+            return path.startsWith("/");
+        }
+        return path.startsWith(ancestor + "/");
     }
 
     @Override

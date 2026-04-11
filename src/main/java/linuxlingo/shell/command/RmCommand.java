@@ -18,14 +18,17 @@ public class RmCommand implements Command {
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean recursive = false;
         boolean force = false;
+        boolean endOfOptions = false;
         List<String> paths = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-r")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-r")) {
                 recursive = true;
-            } else if (arg.equals("-f")) {
+            } else if (!endOfOptions && arg.equals("-f")) {
                 force = true;
-            } else if (!arg.startsWith("-")) {
+            } else if (endOfOptions || !arg.startsWith("-")) {
                 paths.add(arg);
             }
         }
@@ -36,6 +39,12 @@ public class RmCommand implements Command {
 
         for (String path : paths) {
             try {
+                String absTarget = session.getVfs().getAbsolutePath(path, session.getWorkingDir());
+                String absCwd = session.getVfs().getAbsolutePath(session.getWorkingDir(), "/");
+                if (absCwd.equals(absTarget) || absCwd.startsWith(absTarget + "/")) {
+                    return CommandResult.error("rm: cannot remove '" + path
+                            + "': current working directory is inside this directory");
+                }
                 session.getVfs().delete(path, session.getWorkingDir(), recursive, force);
             } catch (VfsException e) {
                 return CommandResult.error("rm: " + e.getMessage());

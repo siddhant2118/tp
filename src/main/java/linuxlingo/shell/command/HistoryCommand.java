@@ -31,13 +31,18 @@ public class HistoryCommand implements Command {
         }
 
         if (args.length > 1) {
-            return CommandResult.error("history: too many arguemnts");
+            return CommandResult.error("history: too many arguments");
         }
 
         if (args[0].equals("-c")) {
             history.clear();
             LOGGER.fine("Command history cleared");
             return CommandResult.success("");
+        }
+
+        if (args[0].startsWith("-")) {
+            String optionText = args[0].length() > 1 ? String.valueOf(args[0].charAt(1)) : "-";
+            return CommandResult.error("history: invalid option -- " + optionText);
         }
 
         return showLastN(history, args[0]);
@@ -52,16 +57,22 @@ public class HistoryCommand implements Command {
      * @return a {@link CommandResult} with the last N entries, or an error
      */
     private CommandResult showLastN(List<String> history, String nStr) {
-        int n;
+        long rawCount;
         try {
-            n = Integer.parseInt(nStr);
+            rawCount = Long.parseLong(nStr);
         } catch (NumberFormatException e) {
-            return CommandResult.error("history: numeric argument required");
+            return CommandResult.error("history: " + nStr + ": numeric argument required");
         }
 
-        if ( n < 0) {
-            return CommandResult.error("history: invalid option: " + nStr);
+        if (rawCount > Integer.MAX_VALUE || rawCount < Integer.MIN_VALUE) {
+            return CommandResult.error("history: " + nStr + ": numeric argument out of range");
         }
+
+        if (rawCount < 0) {
+            return CommandResult.error("history: " + nStr + ": invalid count");
+        }
+
+        int n = (int) rawCount;
 
         int startIndex = Math.max(0, history.size() - n);
         return formatHistory(history, startIndex);

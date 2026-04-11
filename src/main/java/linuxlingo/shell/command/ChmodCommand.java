@@ -22,11 +22,14 @@ public class ChmodCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean recursive = false;
+        boolean endOfOptions = false;
         String mode = null;
         String file = null;
 
         for (String arg : args) {
-            if (arg.equals("-R")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-R")) {
                 recursive = true;
             } else if (mode == null) {
                 mode = arg;

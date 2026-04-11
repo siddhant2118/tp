@@ -18,12 +18,15 @@ public class TeeCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean append = false;
+        boolean endOfOptions = false;
         List<String> files = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-a")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-a")) {
                 append = true;
-            } else if (!arg.startsWith("-")) {
+            } else if (endOfOptions || !arg.startsWith("-")) {
                 files.add(arg);
             } else {
                 return CommandResult.error("tee: " + getUsage());

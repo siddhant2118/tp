@@ -26,10 +26,24 @@ public class FindCommand implements Command {
         String namePattern = "*";
         String typeFilter = null;
         String sizeFilter = null;
+        boolean endOfOptions = false;
 
         for (int i = 0; i < args.length; i++) {
+            if (!endOfOptions && args[i].equals("--")) {
+                endOfOptions = true;
+                continue;
+            }
+
             switch (args[i]) {
             case "-name":
+                if (endOfOptions) {
+                    if (path == null) {
+                        path = args[i];
+                    } else {
+                        return CommandResult.error("find: " + getUsage());
+                    }
+                    break;
+                }
                 if (++i < args.length) {
                     namePattern = args[i];
                 } else {
@@ -37,6 +51,14 @@ public class FindCommand implements Command {
                 }
                 break;
             case "-type":
+                if (endOfOptions) {
+                    if (path == null) {
+                        path = args[i];
+                    } else {
+                        return CommandResult.error("find: " + getUsage());
+                    }
+                    break;
+                }
                 if (++i < args.length) {
                     typeFilter = args[i];
                     if (!typeFilter.equals("f") && !typeFilter.equals("d")) {
@@ -47,6 +69,14 @@ public class FindCommand implements Command {
                 }
                 break;
             case "-size":
+                if (endOfOptions) {
+                    if (path == null) {
+                        path = args[i];
+                    } else {
+                        return CommandResult.error("find: " + getUsage());
+                    }
+                    break;
+                }
                 if (++i < args.length) {
                     sizeFilter = args[i];
                     if (!sizeFilter.matches("^[+-]?\\d+$")) {
@@ -57,7 +87,7 @@ public class FindCommand implements Command {
                 }
                 break;
             default:
-                if (args[i].startsWith("-")) {
+                if (!endOfOptions && args[i].startsWith("-")) {
                     return CommandResult.error("find: " + getUsage());
                 }
                 if (path == null) {

@@ -16,14 +16,20 @@ public class MkdirCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean parents = false;
+        boolean endOfOptions = false;
         List<String> paths = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-p")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-p")) {
                 parents = true;
-            } else if (arg.startsWith("-")) {
+            } else if (!endOfOptions && arg.startsWith("-")) {
                 return CommandResult.error("mkdir: invalid option -- " + arg);
             } else {
+                if (arg.isEmpty()) {
+                    return CommandResult.error("mkdir: invalid file name");
+                }
                 paths.add(arg);
             }
         }

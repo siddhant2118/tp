@@ -457,4 +457,26 @@ class VirtualFileSystemTest {
     void resolveParent_nonExistentParent_throwsVfsException() {
         assertThrows(VfsException.class, () -> vfs.resolveParent("/nonexistent/child", "/"));
     }
+
+    @Test
+    void createFile_blankName_throwsVfsException() {
+        assertThrows(VfsException.class, () -> vfs.createFile("", "/"));
+    }
+
+    @Test
+    void createFile_trailingSlash_throwsVfsException() {
+        assertThrows(VfsException.class, () -> vfs.createFile("name/", "/home/user"));
+    }
+
+    @Test
+    void createFile_fileNameTooLong_throwsVfsException() {
+        String longName = "a".repeat(256);
+        assertThrows(VfsException.class, () -> vfs.createFile(longName, "/home/user"));
+    }
+
+    @Test
+    void createDirectory_tooDeep_throwsVfsException() {
+        String deepPath = String.join("/", java.util.Collections.nCopies(51, "a"));
+        assertThrows(VfsException.class, () -> vfs.createDirectory(deepPath, "/home/user", true));
+    }
 }

@@ -3,6 +3,7 @@ package linuxlingo.shell.command;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
@@ -32,7 +33,7 @@ public class DateCommand implements Command {
         }
 
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format, Locale.ENGLISH);
             // Use ZonedDateTime so timezone-related specifiers (%Z → 'z') work.
             return CommandResult.success(ZonedDateTime.now().format(formatter));
         } catch (IllegalArgumentException e) {

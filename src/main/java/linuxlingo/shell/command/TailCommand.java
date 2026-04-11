@@ -22,10 +22,13 @@ public class TailCommand implements Command {
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         int n = 10;
         boolean fromStart = false; // true for -n +N syntax
+        boolean endOfOptions = false;
         List<String> files = new ArrayList<>();
 
         for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-n")) {
+            if (!endOfOptions && args[i].equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && args[i].equals("-n")) {
                 if (i + 1 >= args.length) {
                     return CommandResult.error("tail: option requires an argument -- n");
                 }
@@ -52,7 +55,7 @@ public class TailCommand implements Command {
                         return CommandResult.error("tail: invalid number of lines: " + nArg);
                     }
                 }
-            } else if (args[i].matches("-\\d+")) {
+            } else if (!endOfOptions && args[i].matches("-\\d+")) {
                 // Legacy -N syntax: -5 means -n 5
                 try {
                     n = Integer.parseInt(args[i].substring(1));

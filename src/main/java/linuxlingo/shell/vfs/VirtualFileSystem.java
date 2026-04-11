@@ -12,6 +12,10 @@ import java.util.List;
  * working directory or from the root ({@code "/"}).</p>
  */
 public class VirtualFileSystem {
+    private static final int MAX_FILE_NAME_LENGTH = 255;
+    private static final int MAX_PATH_DEPTH = 50;
+    private static final int MAX_PATH_LENGTH = 4096;
+
     /** Root directory of the virtual file system. */
     private final Directory root;
 
@@ -131,11 +135,16 @@ public class VirtualFileSystem {
      * @throws VfsException if the path points to a directory or permission is denied.
      */
     public RegularFile createFile(String path, String workingDir) {
+        if (path == null || path.isBlank() || endsWithDirectorySeparator(path)) {
+            throw new VfsException("invalid file name");
+        }
         Directory parent = resolveParent(path, workingDir);
         if (parent == null) {
             throw new VfsException("Cannot create file at root");
         }
         String name = getBaseName(path, workingDir);
+        validateFileName(name);
+        validatePathConstraints(path, workingDir);
         if (parent.hasChild(name)) {
             FileNode existing = parent.getChild(name);
             if (existing.isDirectory()) {
@@ -163,6 +172,9 @@ public class VirtualFileSystem {
      * @throws VfsException if the path conflicts with an existing file or permission is denied.
      */
     public Directory createDirectory(String path, String workingDir, boolean parents) {
+        if (path == null || path.isBlank()) {
+            throw new VfsException("invalid file name");
+        }
         if (parents) {
             return createDirectoryRecursive(path, workingDir);
         }
@@ -171,6 +183,8 @@ public class VirtualFileSystem {
             throw new VfsException("Cannot create directory at root");
         }
         String name = getBaseName(path, workingDir);
+        validateFileName(name);
+        validatePathConstraints(path, workingDir);
         if (parent.hasChild(name)) {
             FileNode existing = parent.getChild(name);
             if (existing.isDirectory()) {
@@ -195,8 +209,10 @@ public class VirtualFileSystem {
      */
     private Directory createDirectoryRecursive(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
+        validatePathDepth(parts);
         FileNode current = root;
         for (String part : parts) {
+            validateFileName(part);
             if (!current.isDirectory()) {
                 throw new VfsException("Not a directory: " + current.getAbsolutePath());
             }
@@ -261,7 +277,7 @@ public class VirtualFileSystem {
     public void copy(String srcPath, String destPath, String workingDir, boolean recursive) {
         FileNode src = resolve(srcPath, workingDir);
         if (src.isDirectory() && !recursive) {
-            throw new VfsException("cp: -r not specified; omitting directory '" + srcPath + "'");
+            throw new VfsException("-r not specified; omitting directory '" + srcPath + "'");
         }
 
         // Determine destination
@@ -275,6 +291,9 @@ public class VirtualFileSystem {
         if (destNode != null && destNode.isDirectory()) {
             // Copy into directory
             Directory destDir = (Directory) destNode;
+            if (src.getName().isBlank()) {
+                throw new VfsException("cannot copy directory '/' into itself");
+            }
             FileNode copy = src.deepCopy();
             copy.setName(src.getName());
             destDir.addChild(copy);
@@ -292,6 +311,7 @@ public class VirtualFileSystem {
                 throw new VfsException("Cannot copy to root");
             }
             String name = getBaseName(destPath, workingDir);
+            validateFileName(name);
             FileNode copy = src.deepCopy();
             copy.setName(name);
             parent.addChild(copy);
@@ -566,9 +586,52 @@ public class VirtualFileSystem {
      */
     public String getAbsolutePath(String path, String workingDir) {
         List<String> parts = normalizePath(path, workingDir);
+        validatePathDepth(parts);
         if (parts.isEmpty()) {
             return "/";
         }
-        return "/" + String.join("/", parts);
+        String absolutePath = "/" + String.join("/", parts);
+        if (absolutePath.length() > MAX_PATH_LENGTH) {
+            throw new VfsException("Path too long");
+        }
+        return absolutePath;
+    }
+
+    /**
+     * Validates a file or directory name against VFS naming rules.
+     * Root is represented separately and therefore must not be passed here.
+     */
+    public static void validateFileName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new VfsException("invalid file name");
+        }
+        if (".".equals(name) || "..".equals(name)) {
+            throw new VfsException("invalid file name");
+        }
+        if (name.contains("/")) {
+            throw new VfsException("invalid character '/' in file name");
+        }
+        if (name.length() > MAX_FILE_NAME_LENGTH) {
+            throw new VfsException("File name too long");
+        }
+    }
+
+    private boolean endsWithDirectorySeparator(String path) {
+        return path.length() > 1 && path.endsWith("/");
+    }
+
+    private void validatePathConstraints(String path, String workingDir) {
+        List<String> parts = normalizePath(path, workingDir);
+        validatePathDepth(parts);
+        String absolutePath = parts.isEmpty() ? "/" : "/" + String.join("/", parts);
+        if (absolutePath.length() > MAX_PATH_LENGTH) {
+            throw new VfsException("Path too long");
+        }
+    }
+
+    private void validatePathDepth(List<String> parts) {
+        if (parts.size() > MAX_PATH_DEPTH) {
+            throw new VfsException("Directory nesting too deep");
+        }
     }
 }

@@ -397,6 +397,20 @@ public class ShellParser {
             case IN_DOUBLE_QUOTE:
                 if (c == '"') {
                     state = State.NORMAL; // closing quote, not to be added to current
+                } else if (c == '\\') {
+                    if (i + 1 >= input.length()) {
+                        current.append(c);
+                        break;
+                    }
+                    char next = input.charAt(i + 1);
+                    if (next == '$' || next == '`' || next == '"' || next == '\\') {
+                        current.append(next);
+                        i++;
+                    } else if (next == '\n') {
+                        i++;
+                    } else {
+                        current.append(c);
+                    }
                 } else {
                     current.append(c); // everything inside double quotes is literal
                 }

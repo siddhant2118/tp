@@ -1,6 +1,7 @@
 package linuxlingo.shell;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,11 +36,13 @@ public class ShellLineReader {
     private final LineReader lineReader;
     private final Terminal terminal;
     private final DefaultHistory history;
+    private boolean lastReadReachedEof;
 
     ShellLineReader(LineReader lineReader, Terminal terminal, DefaultHistory history) {
         this.lineReader = lineReader;
         this.terminal = terminal;
         this.history = history;
+        this.lastReadReachedEof = false;
     }
 
     /**
@@ -53,6 +56,7 @@ public class ShellLineReader {
         try {
             Terminal terminal = TerminalBuilder.builder()
                     .system(true)
+                    .encoding(StandardCharsets.UTF_8)
                     .build();
             return buildReader(session, terminal);
         } catch (IOException e) {
@@ -71,6 +75,7 @@ public class ShellLineReader {
         try {
             Terminal terminal = TerminalBuilder.builder()
                     .dumb(true)
+                    .encoding(StandardCharsets.UTF_8)
                     .build();
             return buildReader(session, terminal);
         } catch (IOException e) {
@@ -101,10 +106,26 @@ public class ShellLineReader {
      */
     public String readLine(String prompt) {
         try {
+            lastReadReachedEof = false;
             return lineReader.readLine(prompt);
-        } catch (UserInterruptException | EndOfFileException e) {
+        } catch (EndOfFileException e) {
+            lastReadReachedEof = true;
             return null;
+        } catch (UserInterruptException e) {
+            lastReadReachedEof = false;
+            return "";
+        } catch (RuntimeException e) {
+            lastReadReachedEof = false;
+            LOGGER.warning(() -> "JLine read error: " + e.getMessage());
+            return "";
         }
+    }
+
+    /**
+     * Returns whether the most recent {@link #readLine(String)} ended due to EOF.
+     */
+    public boolean lastReadReachedEof() {
+        return lastReadReachedEof;
     }
 
     /**

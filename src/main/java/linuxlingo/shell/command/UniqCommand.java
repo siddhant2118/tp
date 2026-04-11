@@ -21,15 +21,18 @@ public class UniqCommand implements Command {
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         boolean countOccurrences = false;
         boolean duplicatesOnly = false;
+        boolean endOfOptions = false;
 
         String file = null;
 
         for (String arg : args) {
-            if (arg.equals("-c")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-c")) {
                 countOccurrences = true;
-            } else if (arg.equals("-d")) {
+            } else if (!endOfOptions && arg.equals("-d")) {
                 duplicatesOnly = true;
-            } else if (!arg.startsWith("-") && file == null) {
+            } else if ((endOfOptions || !arg.startsWith("-")) && file == null) {
                 file = arg;
             }
         }

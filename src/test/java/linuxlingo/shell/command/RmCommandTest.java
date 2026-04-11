@@ -118,4 +118,38 @@ public class RmCommandTest {
     public void rm_getDescription_notEmpty() {
         assertFalse(command.getDescription().isEmpty());
     }
+
+    @Test
+    public void rm_cannotDeleteCurrentWorkingDirectory() {
+        vfs.createDirectory("/home/user/work", "/", true);
+        session.setWorkingDir("/home/user/work");
+
+        CommandResult result = command.execute(session, new String[]{"-r", "/home/user/work"}, null);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("current working directory is inside this directory"));
+        assertTrue(vfs.exists("/home/user/work", "/"));
+    }
+
+    @Test
+    public void rm_cannotDeleteAncestorOfCurrentWorkingDirectory() {
+        vfs.createDirectory("/home/user/work/sub", "/", true);
+        session.setWorkingDir("/home/user/work/sub");
+
+        CommandResult result = command.execute(session, new String[]{"-r", "/home/user/work"}, null);
+
+        assertFalse(result.isSuccess());
+        assertTrue(vfs.exists("/home/user/work", "/"));
+    }
+
+    @Test
+    public void rm_doubleDash_deletesDashPrefixedFile() {
+        vfs.createFile("/home/user/-file", "/");
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session, new String[]{"--", "-file"}, null);
+
+        assertTrue(result.isSuccess());
+        assertFalse(vfs.exists("/home/user/-file", "/"));
+    }
 }

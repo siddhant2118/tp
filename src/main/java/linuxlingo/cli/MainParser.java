@@ -35,7 +35,13 @@ public class MainParser {
         ui.printWelcome();
         boolean running = true;
         while (running) {
-            String input = ui.readLine("linuxlingo> ");
+            String input;
+            try {
+                input = ui.readLine("linuxlingo> ");
+            } catch (RuntimeException e) {
+                ui.println("Input error. Please try again.");
+                continue;
+            }
             if (input == null) {
                 break;
             }

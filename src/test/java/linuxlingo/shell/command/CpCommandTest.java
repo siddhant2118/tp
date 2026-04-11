@@ -140,4 +140,49 @@ public class CpCommandTest {
         assertTrue(result.isSuccess());
         assertTrue(vfs.exists("/mydir/myfile.txt", "/"));
     }
+
+    @Test
+    public void cp_recursiveIntoOwnSubdirectory_returnsError() {
+        vfs.createDirectory("/home/user/parent/child", "/", true);
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session,
+                new String[]{"-r", "parent", "parent/child"}, null);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("into itself"));
+    }
+
+    @Test
+    public void cp_rootIntoCurrentDirectory_returnsError() {
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session,
+                new String[]{"-r", "/", "."}, null);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("into itself"));
+    }
+
+    @Test
+    public void cp_directoryWithoutRecursiveFlag_hasSinglePrefix() {
+        vfs.createDirectory("/dir1", "/", false);
+
+        CommandResult result = command.execute(session, new String[]{"dir1", "dir2"}, null);
+
+        assertFalse(result.isSuccess());
+        assertEquals("cp: -r not specified; omitting directory 'dir1'", result.getStderr());
+    }
+
+    @Test
+    public void cp_doubleDash_allowsDashPrefixedFileName() {
+        vfs.createFile("/home/user/-file", "/");
+        vfs.writeFile("/home/user/-file", "/", "data", false);
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session, new String[]{"--", "-file", "copy.txt"}, null);
+
+        assertTrue(result.isSuccess());
+        assertEquals("data", vfs.readFile("/home/user/copy.txt", "/"));
+    }
 }

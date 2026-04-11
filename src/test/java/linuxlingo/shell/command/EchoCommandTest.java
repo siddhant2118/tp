@@ -114,4 +114,12 @@ public class EchoCommandTest {
         assertTrue(result.isSuccess());
         assertEquals("hello", result.getStdout());
     }
+
+    @Test
+    public void echo_doubleDash_stopsFlagParsing() {
+        String[] args = {"--", "-e", "hello\\nworld"};
+        CommandResult result = command.execute(session, args, null);
+        assertTrue(result.isSuccess());
+        assertEquals("-e hello\\nworld\n", result.getStdout());
+    }
 }

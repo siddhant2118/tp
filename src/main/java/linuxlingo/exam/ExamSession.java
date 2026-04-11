@@ -195,6 +195,7 @@ public class ExamSession {
     private ExamResult runExam(List<Question> questions) {
         Objects.requireNonNull(questions, "questions must not be null");
         ExamResult result = new ExamResult();
+        questionInteraction.resetAbort();
         for (int i = 0; i < questions.size(); i++) {
             Question q = Objects.requireNonNull(questions.get(i), "question must not be null");
             int index = i + 1;
@@ -205,7 +206,10 @@ public class ExamSession {
                 boolean correct = handlePracQuestion(pq);
                 result.addResult(q, "", correct);
             } else {
-                questionInteraction.presentQuestionWithResult(q, index, total, result);
+                boolean shouldContinue = questionInteraction.presentQuestionWithResult(q, index, total, result);
+                if (!shouldContinue || questionInteraction.isExamAborted()) {
+                    break;
+                }
             }
         }
         return result;

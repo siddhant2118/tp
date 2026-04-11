@@ -20,10 +20,13 @@ public class HeadCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         int n = 10;
+        boolean endOfOptions = false;
         List<String> files = new ArrayList<>();
 
         for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-n")) {
+            if (!endOfOptions && args[i].equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && args[i].equals("-n")) {
                 if (i + 1 >= args.length) {
                     return CommandResult.error("head: option requires an argument -- n");
                 }
@@ -34,7 +37,7 @@ public class HeadCommand implements Command {
                 } catch (NumberFormatException e) {
                     return CommandResult.error("head: invalid number of lines: " + args[i + 1]);
                 }
-            } else if (args[i].matches("-\\d+")) {
+            } else if (!endOfOptions && args[i].matches("-\\d+")) {
                 // Legacy -N syntax: -5 means -n 5
                 try {
                     n = Integer.parseInt(args[i].substring(1));

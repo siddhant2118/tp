@@ -96,8 +96,16 @@ public class AliasCommandTest {
     @Test
     public void alias_tooManyArgsReturnsError() {
         CommandResult result = command.execute(session, new String[]{"ll=ls", "extra"}, null);
-        assertFalse(result.isSuccess());
-        assertTrue(result.getStderr().contains("too many arguments"));
+        assertTrue(result.isSuccess());
+        assertEquals("ls", session.getAliases().get("ll"));
+    }
+
+    @Test
+    public void alias_tooManyArgsWithoutEquals_showsFirstAliasOnly() {
+        session.getAliases().put("ll", "ls -la");
+        CommandResult result = command.execute(session, new String[]{"ll", "ignored"}, null);
+        assertTrue(result.isSuccess());
+        assertEquals("alias ll='ls -la'", result.getStdout());
     }
 
     @Test

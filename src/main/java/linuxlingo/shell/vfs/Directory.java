@@ -32,6 +32,10 @@ public class Directory extends FileNode {
      * @param child the node to add.
      */
     public void addChild(FileNode child) {
+        if (child == null) {
+            throw new IllegalArgumentException("child must not be null");
+        }
+        VirtualFileSystem.validateFileName(child.getName());
         child.setParent(this);
         children.put(child.getName(), child);
     }

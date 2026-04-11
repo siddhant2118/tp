@@ -22,17 +22,20 @@ public class WcCommand implements Command {
         boolean countLines = false;
         boolean countWords = false;
         boolean countChars = false;
+        boolean endOfOptions = false;
 
         List<String> files = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-l")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-l")) {
                 countLines = true;
-            } else if (arg.equals("-w")) {
+            } else if (!endOfOptions && arg.equals("-w")) {
                 countWords = true;
-            } else if (arg.equals("-c")) {
+            } else if (!endOfOptions && arg.equals("-c")) {
                 countChars = true;
-            } else if (!arg.startsWith("-")) {
+            } else if (endOfOptions || !arg.startsWith("-")) {
                 files.add(arg);
             } else {
                 return CommandResult.error("wc: " + getUsage());

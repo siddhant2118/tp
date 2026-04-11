@@ -207,4 +207,15 @@ public class LsCommandTest {
         assertTrue(result.isSuccess());
         assertTrue(result.getStdout().contains("Main.java"));
     }
+
+    @Test
+    public void ls_doubleDash_treatsDashPrefixedPathAsOperand() {
+        vfs.createFile("/home/user/-rf", "/");
+        session.setWorkingDir("/home/user");
+
+        CommandResult result = command.execute(session, new String[]{"--", "-rf"}, null);
+
+        assertTrue(result.isSuccess());
+        assertEquals("-rf", result.getStdout());
+    }
 }

@@ -461,6 +461,12 @@ class ShellParserTest {
     }
 
     @Test
+    public void parse_doubleQuotedBackslashN_preservedForEchoE() {
+        ShellParser.ParsedPlan plan = parser.parse("echo -e \"line1\\nline2\"");
+        assertEquals("line1\\nline2", plan.segments.get(0).args[1]);
+    }
+
+    @Test
     public void parse_redirectInsideDoubleQuotes_treatedAsLiteral() {
         ShellParser.ParsedPlan plan = parser.parse("echo \"a>b\"");
         assertEquals(1, plan.segments.size());

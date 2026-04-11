@@ -689,4 +689,22 @@ class ShellSessionTest {
         assertTrue(outStream.toString().contains("hello"));
         assertFalse(session.isRunning());
     }
+
+    @Test
+    void executeOnce_redirectWithSuspiciousToken_returnsWarning() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("echo hello > /tmp/u.txt then sort u.txt");
+
+        assertTrue(result.getStderr().contains("then"));
+        assertEquals("hello then sort u.txt\n", vfs.readFile("/tmp/u.txt", "/"));
+    }
+
+    @Test
+    void executeOnce_echoEWithUnicode_preservesAndPrintsCorrectly() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("echo -e \"你好\\n🎉\"");
+
+        assertTrue(result.isSuccess());
+        assertEquals("你好\n🎉\n", result.getStdout());
+    }
 }

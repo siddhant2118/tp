@@ -29,24 +29,27 @@ public class GrepCommand implements Command {
         boolean invertMatch = false;
         boolean useRegex = false;
         boolean listFilesOnly = false;
+        boolean endOfOptions = false;
 
         String patternStr = null;
         List<String> files = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.equals("-i")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-i")) {
                 ignoreCase = true;
-            } else if (arg.equals("-n")) {
+            } else if (!endOfOptions && arg.equals("-n")) {
                 showLineNumbers = true;
-            } else if (arg.equals("-c")) {
+            } else if (!endOfOptions && arg.equals("-c")) {
                 countOnly = true;
-            } else if (arg.equals("-v")) {
+            } else if (!endOfOptions && arg.equals("-v")) {
                 invertMatch = true;
-            } else if (arg.equals("-E")) {
+            } else if (!endOfOptions && arg.equals("-E")) {
                 useRegex = true;
-            } else if (arg.equals("-l")) {
+            } else if (!endOfOptions && arg.equals("-l")) {
                 listFilesOnly = true;
-            } else if (!arg.startsWith("-")) {
+            } else if (endOfOptions || !arg.startsWith("-")) {
                 if (patternStr == null) {
                     patternStr = arg;
                 } else {
@@ -89,7 +92,7 @@ public class GrepCommand implements Command {
                 String content = session.getVfs().readFile(file, session.getWorkingDir());
                 CommandResult fileResult = grepContent(content, file, patternStr, ignoreCase,
                         showLineNumbers, countOnly, invertMatch, useRegex, listFilesOnly, true);
-                if (fileResult.isSuccess() && !fileResult.getStdout().isEmpty()) {
+                if (fileResult.isSuccess() && (!fileResult.getStdout().isEmpty() || countOnly)) {
                     allResults.add(fileResult.getStdout());
                     anyMatch = true;
                 }
@@ -180,20 +183,20 @@ public class GrepCommand implements Command {
             }
         }
 
-        if (count == 0) {
-            return CommandResult.error("");
-        }
-
-        if (listFilesOnly) {
-            return CommandResult.success(fileName != null ? fileName : "");
-        }
-
         if (countOnly) {
             String countStr = String.valueOf(count);
             if (prefixFileName && fileName != null) {
                 countStr = fileName + ":" + countStr;
             }
             return CommandResult.success(countStr);
+        }
+
+        if (count == 0) {
+            return CommandResult.error("");
+        }
+
+        if (listFilesOnly) {
+            return CommandResult.success(fileName != null ? fileName : "");
         }
 
         return CommandResult.success(String.join("\n", results));

@@ -24,17 +24,20 @@ public class SortCommand implements Command {
         boolean reverse = false;
         boolean numeric = false;
         boolean unique = false;
+        boolean endOfOptions = false;
 
         String file = null;
 
         for (String arg : args) {
-            if (arg.equals("-r")) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.equals("-r")) {
                 reverse = true;
-            } else if (arg.equals("-n")) {
+            } else if (!endOfOptions && arg.equals("-n")) {
                 numeric = true;
-            } else if (arg.equals("-u")) {
+            } else if (!endOfOptions && arg.equals("-u")) {
                 unique = true;
-            } else if (!arg.startsWith("-") && file == null) {
+            } else if ((endOfOptions || !arg.startsWith("-")) && file == null) {
                 file = arg;
             } else {
                 return CommandResult.error("sort: " + getUsage());

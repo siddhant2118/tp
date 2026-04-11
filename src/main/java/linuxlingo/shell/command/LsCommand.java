@@ -25,10 +25,13 @@ public class LsCommand implements Command {
         boolean longFormat = false;
         boolean showHidden = false;
         boolean recursive = false;
+        boolean endOfOptions = false;
         List<String> targetPaths = new ArrayList<>();
 
         for (String arg : args) {
-            if (arg.startsWith("-") && arg.length() > 1) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+            } else if (!endOfOptions && arg.startsWith("-") && arg.length() > 1) {
                 for (int i = 1; i < arg.length(); i++) {
                     char option = arg.charAt(i);
                     if (option == 'l') {

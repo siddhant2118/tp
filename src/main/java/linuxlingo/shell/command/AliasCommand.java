@@ -2,6 +2,7 @@ package linuxlingo.shell.command;
 
 import java.util.Map;
 import java.util.logging.Logger;
+
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 
@@ -27,16 +28,14 @@ public class AliasCommand implements Command {
             return listAliases(session);
         }
 
-        if (args.length > 1) {
-            return CommandResult.error("alias: too many arguments");
-        }
+        String primaryArg = args[0];
 
         // if name is provided without '=' then show that specific alias
-        if (!args[0].contains("=")) {
-            return showAlias(session, args[0]);
+        if (!primaryArg.contains("=")) {
+            return showAlias(session, primaryArg);
         }
 
-        return setAlias(session, args[0]);
+        return setAlias(session, primaryArg);
     }
 
     /**

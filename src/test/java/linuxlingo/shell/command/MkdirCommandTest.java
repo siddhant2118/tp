@@ -101,4 +101,19 @@ public class MkdirCommandTest {
         CommandResult result = command.execute(session, new String[]{}, null);
         assertFalse(result.isSuccess());
     }
+
+    @Test
+    public void mkdir_emptyString_returnsError() {
+        CommandResult result = command.execute(session, new String[]{""}, null);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("invalid file name"));
+    }
+
+    @Test
+    public void mkdir_doubleDash_allowsDashPrefixedName() {
+        session.setWorkingDir("/home/user");
+        CommandResult result = command.execute(session, new String[]{"--", "-dir"}, null);
+        assertTrue(result.isSuccess());
+        assertTrue(vfs.exists("/home/user/-dir", "/"));
+    }
 }

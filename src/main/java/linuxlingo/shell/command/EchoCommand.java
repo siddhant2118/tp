@@ -24,7 +24,10 @@ public class EchoCommand implements Command {
 
         // Parse leading flags
         for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-n")) {
+            if (args[i].equals("--")) {
+                startIndex = i + 1;
+                break;
+            } else if (args[i].equals("-n")) {
                 noNewline = true;
                 startIndex = i + 1;
             } else if (args[i].equals("-e")) {

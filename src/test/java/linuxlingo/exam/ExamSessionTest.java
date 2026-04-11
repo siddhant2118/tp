@@ -327,6 +327,19 @@ public class ExamSessionTest {
                 "Unmet PRAC checkpoint should show incorrect");
     }
 
+    @Test
+    public void startWithArgs_abortStopsExamAndShowsPartialScore() throws Exception {
+        QuestionBank bank = createBankWithQuestions();
+        ExamSession session = createSession("B\nabort\n", bank);
+
+        session.startWithArgs("navigation", 2, false);
+
+        String output = outStream.toString();
+        assertTrue(output.contains("Exam aborted."));
+        assertTrue(output.contains("Score: 1/1 (100%)"));
+        assertTrue(output.contains("[Q2/2]"));
+    }
+
     private QuestionBank createBankWithPracQuestions() throws Exception {
         Path questionsDir = tempDir.resolve("prac_questions");
         Files.createDirectories(questionsDir);

@@ -12,11 +12,24 @@ import linuxlingo.shell.vfs.VfsException;
 public class TouchCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        if (args.length == 0) {
+        boolean endOfOptions = false;
+        java.util.List<String> files = new java.util.ArrayList<>();
+        for (String arg : args) {
+            if (!endOfOptions && arg.equals("--")) {
+                endOfOptions = true;
+                continue;
+            }
+            if (arg.isEmpty()) {
+                return CommandResult.error("touch: invalid file name");
+            }
+            files.add(arg);
+        }
+
+        if (files.isEmpty()) {
             return CommandResult.error("touch: missing file operand");
         }
         try {
-            for (String arg : args) {
+            for (String arg : files) {
                 session.getVfs().createFile(arg, session.getWorkingDir());
             }
             return CommandResult.success("");
