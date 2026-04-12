@@ -2,7 +2,7 @@
 #
 # Format: TYPE | DIFFICULTY | QUESTION | ANSWER | OPTIONS | EXPLANATION
 
-MCQ  | EASY   | Which command changes file permissions? | C | A:chown B:chgrp C:chmod D:chmod | 'chmod' stands for 'change mode'.
+MCQ  | EASY   | Which command changes file permissions? | C | A:chown B:chgrp C:chmod D:chperm | 'chmod' stands for 'change mode'.
 MCQ  | EASY   | In 'rwxr-xr--', what does 'r' stand for? | A | A:Read B:Run C:Remove D:Rename | 'r' means read permission.
 MCQ  | MEDIUM | What octal value represents 'rwx'? | D | A:4 B:5 C:6 D:7 | r=4, w=2, x=1, so rwx = 4+2+1 = 7.
 MCQ  | MEDIUM | What does permission '644' mean? | B | A:rwxrw-r-- B:rw-r--r-- C:rw-rw-r-- D:r--r--r-- | 6=rw-, 4=r--, 4=r--. Owner can read/write, others can only read.
