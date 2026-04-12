@@ -202,6 +202,7 @@ user@linuxlingo:/$ ls -l /home
 drwxr-xr-x  1 user user  0  user/
 
 user@linuxlingo:/$ ls -a
+.hidden
 home/
 tmp/
 etc/
@@ -943,6 +944,7 @@ Available topics:
 3. You type the required commands (e.g., `cd /etc`, `ls`).
 4. Type `exit` to submit.
 5. LinuxLingo checks whether the VFS matches the expected state and gives feedback.
+
 
 ---
 
