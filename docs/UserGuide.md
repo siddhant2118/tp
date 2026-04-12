@@ -945,6 +945,8 @@ Available topics:
 4. Type `exit` to submit.
 5. LinuxLingo checks whether the VFS matches the expected state and gives feedback.
 
+![SequenceFlowPracQuestion.png](imgs/SequenceFlowPracQuestion.png)
+
 
 ---
 
