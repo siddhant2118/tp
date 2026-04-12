@@ -415,6 +415,13 @@ Format: `find [DIRECTORY] [-name PATTERN] [-type TYPE] [-size SIZE]`
 Examples:
 
 - `find /home -name "*.txt"` -- find all `.txt` files under `/home`.
+    ```text
+    user@linuxlingo:/$ touch /home/a.txt /home/b.txt
+    user@linuxlingo:/$ find /home -name "*.txt"
+    /home/a.txt
+    /home/b.txt
+    ```
+
 - `find / -type d -name "src"` -- find directories named "src".
 - `find /home -name "*.log" -size +100` -- find log files larger than 100 bytes.
 
@@ -427,12 +434,22 @@ Format: `wc [-l] [-w] [-c] [FILE...]`
 - `-l` -- count lines only.
 - `-w` -- count words only.
 - `-c` -- count characters only.
-- No flags -- show all three counts.
+- No flags -- show all three counts, in order of lines, words, and characters.
 
 Examples:
 
 - `wc readme.txt` -- show line, word, and character counts.
+    ```text
+    user@linuxlingo:/home/user$ echo "hello" > hello.txt
+    user@linuxlingo:/home/user$ wc hello.txt
+    1 1 6 hello.txt
+    ```
+
 - `echo "hello world" | wc -w` -- count words in piped input.
+    ```text
+    user@linuxlingo:/home/user$ echo "hello" | wc -w
+    1
+    ```
 
 #### Sorting lines: `sort`
 
