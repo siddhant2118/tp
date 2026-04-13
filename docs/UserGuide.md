@@ -869,7 +869,16 @@ Format: `exam`
 - Shows feedback (✓ Correct! / ✗ Incorrect. and explanation) after each question.
 - Shows a final score summary at the end.
 
-> [Tip] **Tip:** Type `quit` to skip a question during an exam.
+#### In-exam control commands (skip / abort)
+
+During an exam run, you can control the session using these special commands:
+
+- `quit` — **skip** the current MCQ or FITB question and continue to the next question.
+- `abort` — **terminate** the entire exam immediately. LinuxLingo will show your **partial score** for the questions attempted so far, then return you to the main menu.
+
+For PRAC questions:
+
+- `exit` — submit your current progress for that PRAC question and move to the next question.
 
 #### Topic-Based Exam with CLI Arguments: `exam -t`
 
@@ -893,6 +902,8 @@ Format: `exam -random`
 - Useful for quick knowledge check
 - The question type can be MCQ, FITB, or PRAC.
 - Shows immediate feedback and explanation, then returns you to the main menu.
+
+![RandomQuestionExam.png](imgs/RandomQuestionExam.png)
 
 #### Listing topics: `exam -topics`
 
@@ -985,6 +996,7 @@ A: Aliases only persist for the current shell session. You will need to redefine
 | Exec in Env | `exec -e ENV_NAME "COMMAND"` | Execute a command in a saved environment |
 | Help | `help` | Show available commands |
 | Exit | `exit` or `quit` | Exit the application |
+| Abort (in exam) | `abort` | Abort the ongoing exam and show partial results |
 
 ### Shell Commands
 
