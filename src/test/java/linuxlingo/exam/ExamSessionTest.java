@@ -354,6 +354,34 @@ public class ExamSessionTest {
         assertTrue(output.contains("[Q2/2]"));
     }
 
+    @Test
+    public void startWithArgs_invalidMcqAnswer_repromptsUntilValid() throws Exception {
+        QuestionBank bank = createBankWithQuestions();
+        // First question is MCQ. Enter invalid option then a valid option, then answer FITB.
+        ExamSession session = createSession("Z\nB\nls\n", bank);
+        session.startWithArgs("navigation", 2, false);
+
+        String output = outStream.toString();
+        assertTrue(output.contains("Invalid input. Please enter A, B, C, or D."),
+                "Exam mode should reprompt on invalid MCQ input");
+        assertTrue(output.contains("Correct"),
+                "After re-prompting, should accept valid MCQ input and continue");
+    }
+
+    @Test
+    public void startWithArgs_emptyFitbAnswer_repromptsUntilNonEmpty() throws Exception {
+        QuestionBank bank = createBankWithQuestions();
+        // Answer MCQ correctly, then provide empty FITB answer then valid.
+        ExamSession session = createSession("B\n\nls\n", bank);
+        session.startWithArgs("navigation", 2, false);
+
+        String output = outStream.toString();
+        assertTrue(output.contains("Invalid input. Please enter a non-empty answer."),
+                "Exam mode should reprompt on empty FITB input");
+        assertTrue(output.contains("Correct"),
+                "After re-prompting, should accept non-empty FITB input");
+    }
+
     private QuestionBank createBankWithPracQuestions() throws Exception {
         Path questionsDir = tempDir.resolve("prac_questions");
         Files.createDirectories(questionsDir);

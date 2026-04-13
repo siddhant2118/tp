@@ -111,7 +111,14 @@ class QuestionInteraction {
         Objects.requireNonNull(question, "question must not be null");
         Objects.requireNonNull(result, "result must not be null");
 
-        String userAnswer = askQuestion(question, index, total);
+        String userAnswer;
+        if (question instanceof McqQuestion) {
+            userAnswer = askValidatedMcqAnswer((McqQuestion) question, index, total);
+        } else if (question instanceof FitbQuestion) {
+            userAnswer = askValidatedFitbAnswer((FitbQuestion) question, index, total);
+        } else {
+            userAnswer = askQuestion(question, index, total);
+        }
         if (userAnswer != null && userAnswer.trim().equalsIgnoreCase("abort")) {
             examAborted = true;
             ui.println("Exam aborted.");
