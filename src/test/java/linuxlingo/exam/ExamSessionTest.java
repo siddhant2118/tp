@@ -79,11 +79,14 @@ public class ExamSessionTest {
     }
 
     @Test
-    public void startInteractive_invalidTopicNumber_printsError() throws Exception {
+    public void startInteractive_invalidTopicNumber_printsErrorAndReprompts() throws Exception {
         QuestionBank bank = createBankWithQuestions();
-        ExamSession session = createSession("99\n", bank);
+        // Enter invalid selection, then recover with valid topic selection.
+        ExamSession session = createSession("99\n1\n\nB\nls\n", bank);
         session.startInteractive();
-        assertTrue(outStream.toString().contains("Invalid topic selection"));
+        String output = outStream.toString();
+        assertTrue(output.contains("Invalid topic selection"));
+        assertTrue(output.contains("[Q"), "Should proceed into exam after valid topic selected");
     }
 
     @Test
@@ -247,6 +250,17 @@ public class ExamSessionTest {
                 "Random mode should show an explanation for the question");
         assertTrue(output.contains("Correct") || output.contains("Incorrect"),
                 "Random mode should indicate whether the answer was correct or incorrect");
+    }
+
+    @Test
+    public void runOneRandom_userQuit_printsSkipped() throws Exception {
+        QuestionBank bank = createBankWithQuestions();
+        ExamSession session = createSession("quit\n", bank);
+        session.runOneRandom();
+
+        String output = outStream.toString();
+        assertTrue(output.contains("Skipped."),
+                "Random mode should explicitly indicate a skipped question when user types quit");
     }
 
     @Test
