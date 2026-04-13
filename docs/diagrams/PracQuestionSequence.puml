@@ -12,12 +12,6 @@ note right of VFS : Create fresh VFS
 ES -> PQ : hasSetup()
 PQ --> ES : true
 
-note right of ES
-  **Planned (not yet wired):**
-  applySetup(tempVfs) is implemented
-  in PracQuestion but not yet called
-  by ExamSession.
-end note
 ' ES -> PQ : applySetup(tempVfs)
 ' note right of PQ
 '   For each SetupItem:

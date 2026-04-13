@@ -28,8 +28,6 @@ alt userAnswer != null AND userAnswer.trim().equalsIgnoreCase("abort")
   QI --> ES : return false
   deactivate QI
 
-  ES -> QI : isExamAborted()
-  QI --> ES : true
   ES -> ES : break question loop
 
 else userAnswer == null OR userAnswer.trim().equalsIgnoreCase("quit")
@@ -37,8 +35,6 @@ else userAnswer == null OR userAnswer.trim().equalsIgnoreCase("quit")
   QI --> ES : return true
   deactivate QI
 
-  ES -> QI : isExamAborted()
-  QI --> ES : false
   ES -> ES : continue to next question
 
 else normal answer
@@ -46,9 +42,9 @@ else normal answer
   Q --> QI : correct?
 
   alt correct
-    QI -> UI : println("✓ Correct!")
+    QI -> UI : println("Correct!")
   else incorrect
-    QI -> UI : println("✗ Incorrect.")
+    QI -> UI : println("Incorrect.")
   end
 
   QI -> UI : println("Explanation: " + Q.getExplanation())
@@ -56,8 +52,6 @@ else normal answer
   QI --> ES : return true
   deactivate QI
 
-  ES -> QI : isExamAborted()
-  QI --> ES : false
   ES -> ES : continue to next question
 end
 
