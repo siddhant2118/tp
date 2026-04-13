@@ -624,8 +624,6 @@ Examples:
 >
 > ![Chaining_Example.png](docs/imgs/AliasCommandChainingExample.png)
 
-> **Note:** Aliases last for the current session are saved when you leave the Shell Simulator.
-
 ---
 
 ### Removing aliases : `unalias`
@@ -666,9 +664,9 @@ user@linuxlingo:/$ history
     3  mkdir projects
 ```
 
-> **Note:** Every command you enter is recorded, including ones that produce errors. The `history` command itself is also recorded. History resets when you leave the Shell Simulator.
-
-![History_Example.png](docs/imgs/HistoryCommandExample.png)
+> **Note:** Every command you enter is recorded, including ones that produce errors. The `history` command itself is also recorded.
+>
+>![History_Example.png](docs/imgs/HistoryCommandExample.png)
 ---
 
 
