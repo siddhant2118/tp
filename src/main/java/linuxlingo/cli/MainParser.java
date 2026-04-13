@@ -1,6 +1,7 @@
 package linuxlingo.cli;
 
 import linuxlingo.exam.ExamSession;
+import linuxlingo.exam.ExamCommandParser;
 import linuxlingo.shell.ShellSession;
 
 /**
@@ -145,48 +146,29 @@ public class MainParser {
      * delegating to the appropriate {@link ExamSession} method.
      */
     private void handleExam(String[] parts) {
-        if (parts.length == 1) {
-            examSession.startInteractive();
+        String[] args = (parts.length <= 1) ? new String[0] : java.util.Arrays.copyOfRange(parts, 1, parts.length);
+        ExamCommandParser.ParsedExamArgs parsed = ExamCommandParser.parse(args);
+        if (!parsed.ok) {
+            ui.println("Invalid exam command: " + parsed.errorMessage);
+            ui.println(ExamCommandParser.USAGE);
             return;
         }
 
-        String topic = null;
-        int count = -1;
-        boolean random = false;
-        boolean listTopics = false;
-
-        for (int i = 1; i < parts.length; i++) {
-            switch (parts[i]) {
-            case "-t" -> {
-                if (i + 1 < parts.length) {
-                    topic = parts[++i];
-                }
-            }
-            case "-n" -> {
-                if (i + 1 < parts.length) {
-                    try {
-                        count = Integer.parseInt(parts[++i]);
-                    } catch (NumberFormatException e) {
-                        ui.println("Invalid count: " + parts[i]);
-                        return;
-                    }
-                }
-            }
-            case "-random" -> random = true;
-            case "-topics" -> listTopics = true;
-            default -> { }
-            }
-        }
-
-        if (listTopics) {
+        if (parsed.listTopics) {
             examSession.listTopics();
-        } else if (random && topic == null) {
-            examSession.runOneRandom();
-        } else if (topic != null) {
-            examSession.startWithArgs(topic, count, random);
-        } else {
-            examSession.startInteractive();
+            return;
         }
+        if (parsed.random && parsed.topic == null) {
+            examSession.runOneRandom();
+            return;
+        }
+        if (parsed.topic != null) {
+            int count = parsed.count == null ? -1 : parsed.count;
+            examSession.startWithArgs(parsed.topic, count, parsed.random);
+            return;
+        }
+
+        examSession.startInteractive();
     }
 
     /** Prints the list of available top-level commands to the UI. */
