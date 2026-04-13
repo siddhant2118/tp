@@ -3,7 +3,6 @@ package linuxlingo.shell.command;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import static java.util.Arrays.copyOfRange;
 
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
@@ -30,12 +29,18 @@ public class AliasCommand implements Command {
             return listAliases(session);
         }
 
+        if (args.length >= 2 && (args[1].equals("=") || args[1].startsWith("="))) {
+            return CommandResult.error(
+                    "alias: invalid syntax: spaces around '=' are not allowed "
+                            + "(use: alias " + args[0] + "=" + (args.length > 2 ? args[2] : args[1].substring(1)) + ")");
+        }
+
         String primaryArg = args[0];
 
         // if name is provided without '=' then show that specific alias
         if (!primaryArg.contains("=")) {
             if (args.length > 1) {
-                return CommandResult.error("alias: invalid syntax");
+                return CommandResult.error("alias: too many arguments");
             }
             return showAlias(session, primaryArg);
         }
