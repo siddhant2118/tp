@@ -1,0 +1,52 @@
+@startuml
+title Question Models (MCQ/FITB)
+
+skinparam classAttributeIconSize 0
+
+abstract class Question {
+  {static} enum QuestionType { MCQ; FITB; PRAC }
+  {static} enum Difficulty { EASY; MEDIUM; HARD }
+
+  #type : QuestionType
+  #difficulty : Difficulty
+  #questionText : String
+  #explanation : String
+
+  +present() : String
+  +checkAnswer(answer : String) : boolean
+  +getExplanation() : String
+  +getDifficulty() : Difficulty
+  +getType() : QuestionType
+  +getQuestionText() : String
+  +formatHeader() : String
+}
+
+class McqQuestion {
+  -options : LinkedHashMap<Character, String>
+  -correctAnswer : char
+
+  +present() : String
+  +checkAnswer(answer : String) : boolean
+  +getCorrectAnswer() : char
+  +getOptions() : LinkedHashMap<Character, String>
+}
+
+class FitbQuestion {
+  -acceptedAnswers : List<String>
+
+  +present() : String
+  +checkAnswer(answer : String) : boolean
+  +getAcceptedAnswers() : List<String>
+}
+
+Question <|-- McqQuestion
+Question <|-- FitbQuestion
+
+note right of Question
+checkAnswer(answer) is polymorphic:
+- MCQ: validates A-D then compares to correctAnswer
+- FITB: trims and checks membership in acceptedAnswers
+end note
+
+@enduml
+

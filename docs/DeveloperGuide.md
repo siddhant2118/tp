@@ -413,6 +413,33 @@ The exam module supports three entry modes and three question types.
 
 ![Exam Session Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ExamSessionSequence.puml)
 
+#### In-exam control commands (skip / abort)
+
+During an exam run, the user can control the session without exiting the whole application:
+
+- `quit` — **skip** the current (non-PRAC) question and continue to the next.
+- `abort` — **terminate** the exam immediately (partial score is shown for attempted questions).
+
+These commands are interpreted centrally by `QuestionInteraction`, not by individual `Question` subclasses. This keeps question types focused on domain logic (`present()` / `checkAnswer(...)`) while the exam UX policy lives in the interaction layer.
+
+**Where the logic lives:**
+
+- `ExamSession.runExam(...)` owns the question loop.
+- `QuestionInteraction.presentQuestionWithResult(...)` reads the raw user input and applies the skip/abort policy before grading.
+- `ExamResult` accumulates outcomes and can represent a partial run naturally.
+
+**Command handling rules (non-PRAC questions):**
+
+1. If the user types `abort` (case-insensitive), `QuestionInteraction` sets an internal abort flag and signals `ExamSession` to stop iterating.
+2. If the user types `quit` (case-insensitive) or input is `null`, the question is recorded as skipped (stored with empty answer and counted as incorrect), and the exam continues.
+3. Otherwise, the answer is passed to `Question.checkAnswer(...)` and the result is recorded.
+
+This design prevents control-flow logic from being duplicated across modes (interactive vs direct vs random), since the same `QuestionInteraction` logic is reused.
+
+The following sequence diagram illustrates how `quit` and `abort` are handled for **non-PRAC** questions during an exam run:
+
+![Exam session – In-exam control commands (quit / abort)](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ExamControlCommandsSequence.puml)
+
 **PRAC question handling:**
 
 For practical questions, `ExamSession.handlePracQuestion()`:
@@ -442,10 +469,9 @@ These changes are internal to the exam module and transparent to callers such as
 
 At a high level, the flow for a `PRAC` question becomes:
 
-1. `ExamSession` creates a fresh `VirtualFileSystem` via `vfsFactory`.
-2. `ExamSession` asks the `PracQuestion` to apply any configured setup into that VFS (planned — `applySetup()` is implemented in `PracQuestion` but not yet called by `ExamSession`).
-3. `ExamSession` starts a temporary `ShellSession` over the prepared VFS and lets the user perform the task.
-4. When the user exits the shell, `PracQuestion.checkVfs()` verifies all `Checkpoint`s against the final VFS state.
+ 1. `ExamSession` creates a fresh `VirtualFileSystem` via `vfsFactory`.
+ 2. `ExamSession` starts a temporary `ShellSession` over the fresh VFS and lets the user perform the task.
+ 3. When the user exits the shell, `PracQuestion.checkVfs()` verifies all `Checkpoint`s against the final VFS state.
 
 The feature is implemented by extending the existing `PracQuestion` and `Checkpoint` classes; no new top-level types are introduced.
 
@@ -474,7 +500,8 @@ The feature is implemented by extending the existing `PracQuestion` and `Checkpo
 
 - `ExamSession` (in `linuxlingo.exam`)
   - Orchestrates `PRAC` questions via `handlePracQuestion(PracQuestion q)`.
-  - Planned: call `q.applySetup(tempVfs)` before starting the `ShellSession` (not yet wired).
+  - Current: creates a fresh VFS, starts a temp shell, then checks the final VFS (`q.checkVfs(tempVfs)`).
+  - Not yet wired: calling `q.applySetup(tempVfs)` before starting the `ShellSession`.
 
 This keeps the public interface between modules unchanged: the CLI, Shell, and Storage components continue to treat the Exam module as a black box that exposes `ExamSession` and `QuestionBank` only.
 
@@ -576,28 +603,226 @@ This design leaves room for future growth:
 
 ### Question Parsing and Loading
 
-Question bank files use a pipe-delimited format. `QuestionParser` processes each line into typed `Question` objects.
-The question bank parsing feature is implemented by QuestionParser, which reads plain-text .txt files from the data/questions directory via Storage.readLines(Path) and converts each non-comment, non-blank line into a concrete Question object.
-Each line is pipe-delimited into up to six fields: TYPE | DIFFICULTY | QUESTION_TEXT | ANSWER | OPTIONS | EXPLANATION.
-QuestionParser normalises the type and difficulty (defaulting invalid difficulty values to MEDIUM), then dispatches to parseMcq, parseFitb, or parsePrac based on the TYPE field.
-MCQ options are parsed into a LinkedHashMap<Character, String> to preserve display order, FITB answers are split on unescaped | (with \| treated as a literal pipe), and PRAC answers are parsed into Checkpoint objects supporting both basic types (`DIR`, `FILE`) and extended types (`NOT_EXISTS`, `CONTENT_EQUALS`, `PERM`), with optional setup items parsed from the OPTIONS field.
-Malformed lines are skipped with a logged warning instead of failing the entire file, and an assertion ensures that the resulting question list contains no null entries.
-We chose a pipe-separated text format instead of JSON/YAML to keep the files compact, easy to edit, and diff-friendly for contributors.
-Alternatives such as embedding questions directly in Java code or using a more complex DSL were rejected because they would make non-developer contributions harder and tightly couple content with implementation;
-the current design keeps parsing logic centralized in QuestionParser and lets the rest of the exam module work purely with typed Question objects.
+This section explains how question bank files under `data/questions/` are converted into in-memory `Question` objects.
+
+#### Design overview
+
+At runtime, question data flows through the pipeline below:
+
+1. **`QuestionBank.load(Path directory)`** enumerates `.txt` files in the questions directory via `Storage.listFiles(...)`.
+2. For each file, **`QuestionParser.parseFile(Path file)`** reads the file, converts each valid line into a concrete `Question`, and returns a `List<Question>`.
+3. `QuestionBank` stores the resulting `List<Question>` under a **topic key** derived from the filename (e.g., `navigation.txt` → `"navigation"`).
+4. `ExamSession` later requests questions by topic via `questionBank.getQuestions(topic, count, random)`.
+
 **Data flow:**
 
 ![Question Parsing Activity Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/QuestionParsingActivity.puml)
 
-**Question bank line format:**
+---
+
+#### File and line format
+
+Each non-empty, non-comment line in a question bank file is expected to be pipe-delimited with **up to 6 fields**:
 
 ```text
 TYPE | DIFFICULTY | QUESTION_TEXT | ANSWER | OPTIONS | EXPLANATION
 ```
 
-- **MCQ** answer: single letter (e.g., `B`). Options: `A:text B:text C:text D:text`.
-- **FITB** answer: accepted answers separated by `|` (e.g., `pwd|PWD`). Escaped pipes (`\|`) are treated as literal pipe characters.
-- **PRAC** answer: checkpoints as `path:TYPE` pairs (e.g., `/home/project:DIR,/home/readme.txt:FILE`). Supported types: `DIR`, `FILE`, `NOT_EXISTS`, `CONTENT_EQUALS=value`, `PERM=rwxr-xr-x`. Optional setup items in the OPTIONS field (semicolon-separated).
+`QuestionParser` trims fields and normalises `TYPE`/`DIFFICULTY` before constructing the corresponding question object.
+
+| Field | Meaning | Used by |
+| --- | --- | --- |
+| `TYPE` | `MCQ`, `FITB`, or `PRAC` | Dispatch to `parseMcq` / `parseFitb` / `parsePrac` |
+| `DIFFICULTY` | `EASY`, `MEDIUM`, `HARD` | Stored on `Question` object; used for display/filtering |
+| `QUESTION_TEXT` | Prompt shown to user | `Question.present()` |
+| `ANSWER` | Correct answer (format depends on type) | `checkAnswer(...)` or `Checkpoint` list |
+| `OPTIONS` | Type-specific extra data | MCQ options / PRAC setup items |
+| `EXPLANATION` | Shown after grading | `Question.getExplanation()` |
+
+---
+
+#### Type-specific parsing rules
+
+The following diagrams zoom in on the MCQ/FITB-specific parsing and model structure:
+
+![MCQ/FITB Line Parsing Activity Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/McqFitbLineParsingActivity.puml)
+
+![Question Models (MCQ/FITB) Class Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/QuestionModelsMcqFitbClassDiagram.puml)
+
+##### MCQ
+
+- **Answer format**: a single letter, e.g. `B`.
+- **Options format**: `A:text B:text C:text D:text`.
+- Parsed into `LinkedHashMap<Character, String>` to preserve display order in `McqQuestion.present()`.
+
+**Parsing logic (exact implementation)**
+
+MCQ lines are handled by `QuestionParser.parseMcq(...)`.
+
+1. **Answer validation**
+   - The `ANSWER` field is trimmed.
+   - If the trimmed answer is blank, parsing fails with `IllegalArgumentException("MCQ answer must not be blank")`.
+2. **Options parsing**
+   - The `OPTIONS` field is trimmed and split using the regex:
+     - `(?=[A-D]:)`
+   - Each split segment is then trimmed and interpreted as:
+     - `letter ':' text`
+   - Only segments where `segment.length() >= 2` and `segment.charAt(1) == ':'` are accepted.
+   - The option map key is `segment.charAt(0)` and the value is `segment.substring(2).trim()`.
+3. **Options validation**
+   - If no valid options are parsed, parsing fails with `IllegalArgumentException("MCQ options must not be empty")`.
+4. **Correct answer must exist in options**
+   - The correct answer character is taken as `answer.charAt(0)`.
+   - It is uppercased for the lookup: `Character.toUpperCase(correctAnswer)`.
+   - If the resulting letter is not a key in the parsed options map, parsing fails with
+     `IllegalArgumentException("MCQ correct answer not found in options")`.
+
+**How invalid MCQ entries are handled**
+
+`QuestionParser.parseFile(...)` catches `RuntimeException` thrown from `parseMcq(...)`.
+If parsing fails, the line is **skipped** (with a logged warning) and the parser continues loading subsequent lines.
+
+Example line:
+
+```text
+MCQ | EASY | Which command prints the current directory? | B | A:cd B:pwd C:ls D:dir | 'pwd' stands for ...
+```
+
+##### FITB
+
+- **Answer format**: one or more accepted answers.
+- `QuestionParser` splits answers and stores them in a `List<String>` used by `FitbQuestion.checkAnswer(...)`.
+- Escaping (notably `\|`) is handled so authors can include literal pipes in answer text.
+
+**Parsing logic (exact implementation)**
+
+FITB lines are handled by `QuestionParser.parseFitb(...)`.
+
+1. **Splitting into accepted answers**
+   - The raw `ANSWER` field is split using the regex:
+     - `(?<!\\)\|`
+     - i.e., split on `|` that is **not** preceded by a backslash (`\`).
+2. **Trimming and unescaping**
+   - Each split part is processed as:
+     - `acceptedAnswer.trim().replace("\\|", "|")`
+   - Empty strings after trimming are ignored.
+3. **Accepted-answer list must be non-empty**
+   - If the resulting `List<String>` is empty, parsing fails with:
+     - `IllegalArgumentException("FITB accepted answer list must not be empty")`.
+
+**Authoring notes (important for validation)**
+
+- Accepted answers are compared as an **exact string match after trimming**.
+  - `FitbQuestion.checkAnswer(...)` uses `acceptedAnswers.contains(answer.trim())`.
+  - This means the match is **case-sensitive** unless the question bank explicitly provides variants (e.g., `pwd|PWD`).
+- If an accepted answer itself needs to contain a literal `|` character, it must be escaped as `\|` in the bank.
+
+**How invalid FITB entries are handled**
+
+As with MCQ, any `RuntimeException` thrown while parsing a FITB entry causes the line to be **skipped** (with a logged warning).
+
+---
+
+#### Runtime answer input validation (MCQ/FITB)
+
+This section documents how user input is validated during an exam run. It is separate from question-bank parsing.
+
+The following sequence diagram shows the end-to-end interaction when a user answers an MCQ/FITB question (including reprompts, skip, and abort behavior):
+
+![MCQ/FITB Answer Interaction Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/McqFitbAnswerInteractionSequence.puml)
+
+**Where it happens**
+
+- `ExamSession` delegates non-PRAC question attempts to `QuestionInteraction`.
+- `QuestionInteraction.presentQuestionWithResult(...)` selects the appropriate input routine based on the runtime type:
+  - `McqQuestion` -> `askValidatedMcqAnswer(...)`
+  - `FitbQuestion` -> `askValidatedFitbAnswer(...)`
+
+**MCQ input validation (`askValidatedMcqAnswer`)**
+
+- The question is printed once, then the user is repeatedly prompted for `Your answer:` until a valid input is entered.
+- The following inputs are treated as control commands:
+  - `quit` (case-insensitive): skip the question
+  - `abort` (case-insensitive): abort the entire exam
+- Otherwise, the input is valid only if:
+  - after trimming it is exactly **one character**, and
+  - that character (uppercased) is in the range **A-D**.
+- A valid MCQ input is normalized to uppercase (i.e., returns `"A"`, `"B"`, `"C"`, or `"D"`).
+
+**FITB input validation (`askValidatedFitbAnswer`)**
+
+- The question is printed once, then the user is repeatedly prompted for `Your answer:`.
+- The same control commands are supported:
+  - `quit` (case-insensitive): skip the question
+  - `abort` (case-insensitive): abort the entire exam
+- Otherwise, the input is valid only if it is **non-empty after trimming**.
+- The original user input is returned (not the trimmed version). Grading later trims it again.
+
+**Grading logic (`checkAnswer`)**
+
+- MCQ grading is implemented in `McqQuestion.checkAnswer(String)`:
+  - trims user answer
+  - requires length 1
+  - normalizes to uppercase
+  - checks it is within A-D
+  - compares it to the stored `correctAnswer`
+- FITB grading is implemented in `FitbQuestion.checkAnswer(String)`:
+  - trims user answer
+  - checks membership in `acceptedAnswers` (case-sensitive)
+
+**Skip/abort handling**
+
+- If the user input is `abort`, `QuestionInteraction` sets an internal `examAborted` flag, prints `Exam aborted.`, and stops the run.
+- If the user input is `quit` or the UI returns `null`, the question is considered **skipped**:
+  - `ExamResult.addResult(question, "", false)` is recorded (empty stored answer, incorrect)
+
+ Example line:
+
+```text
+FITB | EASY | To print the current directory: ___ | pwd|PWD | | pwd prints the current working directory.
+```
+
+##### PRAC
+
+- **Answer format**: comma-separated checkpoints, each describing an expected VFS state.
+- Each checkpoint becomes a `Checkpoint` object used by `PracQuestion.checkVfs(vfs)`.
+
+Checkpoint examples (illustrative):
+
+- Existence/type: `/home/project:DIR`, `/home/readme.txt:FILE`
+- Non-existence: `/tmp/junk:NOT_EXISTS`
+- Content: `/home/readme.txt:CONTENT_EQUALS=hello`
+- Permission: `/home/secret.txt:PERM=rwxr-x---`
+
+PRAC also supports an optional **setup list** in the `OPTIONS` field (semicolon-separated), which is parsed into `PracQuestion.SetupItem` objects for `PracQuestion.applySetup(vfs)`.
+
+---
+
+#### Error handling and robustness
+
+`QuestionParser` is intentionally forgiving:
+
+- **Malformed lines** are skipped (with a logged warning) rather than failing the entire file.
+- **Invalid difficulty values** are normalised (defaulting to a safe value) so contributors can iterate quickly on content without breaking the app.
+- `QuestionBank.load(...)` skips empty question banks and continues loading other files so one bad topic does not take down the full exam feature.
+
+This matches the project’s goal of allowing question banks to be edited by non-developers without requiring perfect formatting.
+
+---
+
+#### Rationale and alternatives
+
+**Why a pipe-delimited text format (instead of JSON/YAML)?**
+
+- Easy to edit in any text editor.
+- Diff-friendly in version control.
+- Minimal syntax overhead for simple question banks.
+
+**Alternatives considered:**
+
+- **Embedding questions in Java code**: rejected because it couples content to implementation and makes non-developer contributions difficult.
+- **Using JSON/YAML**: rejected due to added verbosity and higher risk of syntax errors for casual contributors.
+- **A more complex DSL**: rejected because it increases parser complexity and maintenance cost.
 
 ---
 

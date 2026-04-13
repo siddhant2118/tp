@@ -1,0 +1,74 @@
+@startuml
+title MCQ/FITB Answer Interaction
+
+actor ExamSession
+participant QuestionInteraction
+participant Ui
+participant "McqQuestion / FitbQuestion" as Q
+participant ExamResult
+
+ExamSession -> QuestionInteraction : presentQuestionWithResult(q, index, total, result)
+
+alt q is McqQuestion
+  QuestionInteraction -> Ui : println("[Qx/total]" + q.present())
+  loop until valid A-D or command
+    QuestionInteraction -> Ui : readLine("Your answer: ")
+    alt input is null
+      QuestionInteraction --> ExamSession : (treat as skip)
+      QuestionInteraction -> ExamResult : addResult(q, "", false)
+      return true
+    else input is invalid
+      QuestionInteraction -> Ui : println("Invalid input... A,B,C,D")
+    else input is "quit"
+      QuestionInteraction -> ExamResult : addResult(q, "", false)
+      return true
+    else input is "abort"
+      QuestionInteraction -> Ui : println("Exam aborted.")
+      return false
+    else valid option
+      break
+    end
+  end
+else q is FitbQuestion
+  QuestionInteraction -> Ui : println("[Qx/total]" + q.present())
+  loop until non-empty or command
+    QuestionInteraction -> Ui : readLine("Your answer: ")
+    alt input is null
+      QuestionInteraction -> ExamResult : addResult(q, "", false)
+      return true
+    else input is empty
+      QuestionInteraction -> Ui : println("Invalid input... non-empty")
+    else input is "quit"
+      QuestionInteraction -> ExamResult : addResult(q, "", false)
+      return true
+    else input is "abort"
+      QuestionInteraction -> Ui : println("Exam aborted.")
+      return false
+    else valid answer
+      break
+    end
+  end
+else other Question
+  QuestionInteraction -> Ui : println("[Qx/total]" + q.present())
+  QuestionInteraction -> Ui : readLine("Your answer: ")
+end
+
+alt answered (not quit/abort/null)
+  QuestionInteraction -> Q : checkAnswer(userAnswer)
+  alt correct
+    QuestionInteraction -> Ui : println("✓ Correct!")
+  else incorrect
+    QuestionInteraction -> Ui : println("✗ Incorrect.")
+  end
+  QuestionInteraction -> Ui : println("Explanation: " + q.getExplanation())
+  QuestionInteraction -> ExamResult : addResult(q, userAnswer, correct)
+  QuestionInteraction --> ExamSession : return true
+else skipped (quit or null)
+  QuestionInteraction -> ExamResult : addResult(q, "", false)
+  QuestionInteraction --> ExamSession : return true
+else aborted
+  QuestionInteraction --> ExamSession : return false
+end
+
+@enduml
+

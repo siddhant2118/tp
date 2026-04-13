@@ -1,0 +1,58 @@
+@startuml
+title MCQ/FITB Line Parsing
+
+start
+:read line (from parseFile loop);
+:trim line;
+
+if (blank or startsWith("#")?) then (yes)
+  :skip line;
+  stop
+endif
+
+:split rawFields = line.split("\\s+\\|\\s+", -1);
+
+if (rawFields.length < 4
+ or rawFields.length > 6?) then (malformed)
+  :log warning;
+  :skip line;
+  stop
+endif
+
+if (rawFields.length < 6?) then (pad)
+  :pad to 6 fields with "";
+endif
+
+:normalize fields (trim, type upper, parseDifficulty);
+
+if (type != "MCQ" and options not empty and explanation empty?) then (swap)
+  :explanation = options;
+  :options = "";
+endif
+if (explanation startsWith "|"?) then (cleanup)
+  :explanation = explanation.substring(1).trim();
+endif
+
+switch (type)
+case (MCQ)
+  :parseMcq(...);
+  if (RuntimeException?) then (invalid)
+    :log + skip;
+    stop
+  endif
+  :add question;
+case (FITB)
+  :parseFitb(...);
+  if (RuntimeException?) then (invalid)
+    :log + skip;
+    stop
+  endif
+  :add question;
+case (other)
+  :skip unknown type;
+  stop
+endswitch
+
+stop
+@enduml
+

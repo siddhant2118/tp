@@ -880,6 +880,20 @@ LinuxLingo includes a built-in exam system to test your knowledge of Linux comma
 
 ![ExamModuleExample.png](imgs/ExamModuleExample.png)
 
+#### Exam command formats
+
+The `exam` command supports multiple modes depending on the flags used:
+
+- `exam` -- start an **interactive** exam (you will be prompted to select a topic and number of questions).
+- `exam -topics` -- list all available topics.
+- `exam -random` -- answer **one** random question from any topic.
+- `exam -t TOPIC [-n COUNT] [-random]` -- start an exam for a specific topic.
+
+> [Note] **Note:** `-random` has two meanings depending on how it is used:
+>
+> - `exam -random` (by itself) is **exclusive** and always runs a **single-question** random quiz.
+> - When used together with other flags (e.g., `exam -t navigation -n 5 -random`), it **randomises the question order** for the exam configured by those flags.
+
 #### Starting an exam : `exam`
 
 Starts an interactive exam session where you choose the topic and number of questions.
@@ -887,21 +901,46 @@ Starts an interactive exam session where you choose the topic and number of ques
 Format: `exam`
 
 - Prompts you to select a topic by number or name.
+- Topic names are **case-sensitive**.
+- If you enter an invalid topic number/name, LinuxLingo will **reprompt** you until a valid topic is provided.
 - Prompts for the number of questions (press Enter for all questions in the topic).
 - Shows feedback (✓ Correct! / ✗ Incorrect. and explanation) after each question.
 - Shows a final score summary at the end.
 
-> [Tip] **Tip:** Type `quit` to skip a question during an exam.
+#### In-exam control commands (skip / abort)
+
+During an exam run, you can control the session using these special commands:
+
+- `quit` — **skip** the current MCQ or FITB question and continue to the next question.
+  LinuxLingo will print that the question was skipped. In the final score, a skipped question is counted as **incorrect**.
+- `abort` — **terminate** the entire exam immediately. LinuxLingo will show your **partial score** for the questions attempted so far, then return you to the main menu.
+
+For PRAC questions:
+
+- `exit` — submit your current progress for that PRAC question and move to the next question.
+
+Control command behaviour depends on the current question type:
+
+| Context | `quit` | `abort` | `exit` |
+| --- | --- | --- | --- |
+| MCQ / FITB prompt | Skip the question (counts as incorrect) | Abort exam and show partial score | Not a valid answer; you will be reprompted to enter a valid input |
+| PRAC temporary shell | Not applicable (use `exit` to submit) | Not supported in PRAC | Submit current PRAC progress and continue |
 
 #### Topic-Based Exam with CLI Arguments: `exam -t`
 
 Starts an exam for a specific topic, optionally with a limited number of questions and random order.
+
 Format: `exam -t TOPIC [-n COUNT] [-random]`
 
 - `-t TOPIC` -- specify the topic (e.g., `navigation`, `file-management`).
 - `-n COUNT` -- number of questions (default: all questions in the topic).
 - `-random` -- randomise question order.
 - If COUNT is greater than the number of questions in the topic, it will use all available questions.
+
+COUNT input rules:
+
+- If COUNT is a **non-number** or a **decimal**, LinuxLingo will **reprompt** for a valid COUNT.
+- If COUNT is `0` or negative, LinuxLingo will default to **all questions** in the topic.
 
 Example: `exam -t text-processing -n 5 -random`
 Starts a 5-question exam from the `text-processing` topic with questions in random order.
@@ -915,6 +954,8 @@ Format: `exam -random`
 - Useful for quick knowledge check
 - The question type can be MCQ, FITB, or PRAC.
 - Shows immediate feedback and explanation, then returns you to the main menu.
+
+![RandomQuestionExam.png](imgs/RandomQuestionExam.png)
 
 #### Listing topics: `exam -topics`
 
@@ -941,6 +982,11 @@ Available topics:
 | **FITB** (Fill In The Blank) | Fill in the missing command or argument. | Type the missing text exactly (e.g., `pwd`). |
 | **PRAC** (Practical) | Perform a task in a temporary shell session. | Execute commands in the temporary shell, then type `exit` when done. The VFS is automatically checked. |
 
+For PRAC questions:
+
+- Each PRAC question starts with a **fresh VFS**.
+- LinuxLingo grades your work by checking whether the **resulting VFS state** matches what the question expects.
+
 **PRAC question example flow:**
 
 1. The question describes a task (e.g., "Navigate to /etc and verify that hostname file exists by using ls.").
@@ -949,8 +995,7 @@ Available topics:
 4. Type `exit` to submit.
 5. LinuxLingo checks whether the VFS matches the expected state and gives feedback.
 
-![SequenceFlowPracQuestion.png](imgs/SequenceFlowPracQuestion.png)
-
+![PRAC question example](imgs/PRACQuestionExample.png)
 
 ---
 
@@ -1010,6 +1055,7 @@ A: Aliases only persist for the current shell session. You will need to redefine
 | Exec in Env | `exec -e ENV_NAME "COMMAND"` | Execute a command in a saved environment |
 | Help | `help` | Show available commands |
 | Exit | `exit` or `quit` | Exit the application |
+| Abort (in exam) | `abort` | Abort the ongoing exam and show partial results |
 
 ### Shell Commands
 

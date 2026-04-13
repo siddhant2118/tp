@@ -32,7 +32,7 @@ import linuxlingo.shell.vfs.VirtualFileSystem;
  * <ol>
  *   <li>{@code ExamSession} presents the question text.</li>
  *   <li>A temporary {@code ShellSession} is opened for the user to type commands.</li>
- *   <li>When the user types "done", the VFS is passed to {@link #checkVfs(VirtualFileSystem)}.</li>
+ *   <li>When the user types "exit", the VFS is passed to {@link #checkVfs(VirtualFileSystem)}.</li>
  *   <li>Each {@link Checkpoint} is verified: correct path + correct node type.</li>
  * </ol>
  *

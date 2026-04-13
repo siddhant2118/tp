@@ -58,7 +58,7 @@ enum "Checkpoint.NodeType" as NodeType {
 class ExamSession {
     - questionBank : QuestionBank
     - ui : Ui
-    - vfsFactory : Supplier<VFS>
+    - vfsFactory : Supplier<VirtualFileSystem>
     - questionInteraction : QuestionInteraction
     - randomQuestionMode : RandomQuestionMode
     + startInteractive()
@@ -67,6 +67,9 @@ class ExamSession {
     + listTopics()
     - handlePracQuestion(q) : boolean
 }
+
+' Note: VirtualFileSystem lives in linuxlingo.shell.vfs
+class VirtualFileSystem
 
 class QuestionInteraction {
     - ui : Ui
