@@ -768,10 +768,10 @@ class ShellSessionTest {
     }
 
     @Test
-    void start_historyCommandNotAddedToHistory() {
+    void start_historyCommandIsAddedToHistory() {
         ShellSession session = createSession("history\nexit\n");
         session.start();
-        assertFalse(session.getCommandHistory().contains("history"),
+        assertTrue(session.getCommandHistory().contains("history"),
                 "'history' command must not record itself");
     }
 

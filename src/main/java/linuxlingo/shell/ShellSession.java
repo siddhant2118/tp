@@ -146,9 +146,9 @@ public class ShellSession {
                 break;
             }
 
-            if (!trimmed.equals("history")) {
-                commandHistory.add(trimmed); // history should not record itself (mimics bash)
-            }
+
+            commandHistory.add(trimmed);
+
 
             executePlan(input);
         }
