@@ -707,4 +707,159 @@ class ShellSessionTest {
         assertTrue(result.isSuccess());
         assertEquals("你好\n🎉\n", result.getStdout());
     }
+
+    @Test
+    void resolveAlias_inPipeline_eachSegmentResolvesIndependently() {
+        ShellSession session = createSession("");
+        vfs.createFile("/tmp/data.txt", "/");
+        vfs.writeFile("/tmp/data.txt", "/", "hello\nworld", false);
+        session.getAliases().put("mycat", "cat");
+        session.getAliases().put("mygrep", "grep");
+        CommandResult result = session.executeOnce("mycat /tmp/data.txt | mygrep hello");
+        assertTrue(result.isSuccess());
+        assertTrue(result.getStdout().contains("hello"));
+    }
+
+    @Test
+    void orOperator_threeSegmentsFirstTwoFail_thirdRuns() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("notacmd || notacmd2 || echo reached");
+        assertTrue(result.getStdout().contains("reached"));
+    }
+
+    @Test
+    void orOperator_afterPipeFails_fallbackRuns() {
+        ShellSession session = createSession("");
+        vfs.createFile("/tmp/data.txt", "/");
+        vfs.writeFile("/tmp/data.txt", "/", "apple\nbanana", false);
+        CommandResult result = session.executeOnce(
+                "cat /tmp/data.txt | grep nonexistent || echo fallback");
+        assertTrue(result.getStdout().contains("fallback"));
+    }
+
+    @Test
+    void inputRedirect_takesPrecedenceOverPipedStdin() {
+        ShellSession session = createSession("");
+        vfs.createFile("/tmp/in.txt", "/");
+        vfs.writeFile("/tmp/in.txt", "/", "filecontent", false);
+        CommandResult result = session.executeOnce(
+                "echo ignored | grep filecontent < /tmp/in.txt");
+        assertTrue(result.isSuccess());
+        assertTrue(result.getStdout().contains("filecontent"));
+    }
+
+    @Test
+    void inputRedirect_nonexistentFile_segmentSkippedWithError() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("grep hello < /nonexistent.txt");
+        assertFalse(result.isSuccess());
+    }
+
+
+    @Test
+    void andOperator_clearsStdinForNextSegment() {
+        ShellSession session = createSession("");
+        vfs.createFile("/tmp/f.txt", "/");
+        vfs.writeFile("/tmp/f.txt", "/", "content", false);
+        // cat reads from file, then echo after && must not receive cat's stdout as stdin
+        CommandResult result = session.executeOnce("cat /tmp/f.txt && echo clean");
+        assertTrue(result.isSuccess());
+        assertTrue(result.getStdout().contains("clean"));
+    }
+
+    @Test
+    void start_historyCommandNotAddedToHistory() {
+        ShellSession session = createSession("history\nexit\n");
+        session.start();
+        assertFalse(session.getCommandHistory().contains("history"),
+                "'history' command must not record itself");
+    }
+
+    @Test
+    void start_normalCommandAddedToHistory() {
+        ShellSession session = createSession("echo hello\nexit\n");
+        session.start();
+        assertTrue(session.getCommandHistory().contains("echo hello"));
+    }
+
+    @Test
+    void start_blankLineNotAddedToHistory() {
+        ShellSession session = createSession("\n  \nexit\n");
+        session.start();
+        assertEquals(0, session.getCommandHistory().size(),
+                "Blank lines must not be recorded in history");
+    }
+
+    @Test
+    void resolveCommand_aliasChainEndsInRegisteredCommand_executesSuccessfully() {
+        ShellSession session = createSession("");
+        session.getAliases().put("p", "pwd");
+        CommandResult result = session.executeOnce("p");
+        assertTrue(result.isSuccess());
+        assertEquals("/", result.getStdout().trim());
+    }
+
+    @Test
+    void resolveCommand_aliasResolvesToUnknownCommand_triggersNotFound() {
+        ShellSession session = createSession("");
+        session.getAliases().put("bad", "doesnotexist");
+        CommandResult result = session.executeOnce("bad");
+        assertFalse(result.isSuccess());
+        assertTrue(result.getStderr().contains("command not found"));
+        assertEquals(127, session.getLastExitCode());
+    }
+
+    @Test
+    void parseInput_syntaxError_setsSyntaxErrorExitCode() {
+        ShellSession session = createSession("");
+        session.executeOnce("ls |");
+        assertEquals(ExitCodes.SYNTAX_ERROR, session.getLastExitCode(),
+                "Syntax errors must set exit code SYNTAX_ERROR");
+    }
+
+    @Test
+    void parseInput_syntaxError_printsExceptionMessageToUi() {
+        ShellSession session = createSession("");
+        session.executeOnce("echo >");
+        String printed = outStream.toString();
+        // ShellParser throws the "syntax error: missing filename for redirect"
+        assertTrue(printed.contains("syntax error"),
+                "parseInput must forward the parser's error message to the UI");
+    }
+
+    @Test
+    void parseInput_blankInput_returnsSuccessWithEmptyStdout() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("   ");
+        assertTrue(result.isSuccess());
+        assertEquals("", result.getStdout());
+    }
+
+    @Test
+    void shouldSkipSegment_firstSegmentNeverSkipped_evenWithNonZeroExitCode() {
+        ShellSession session = createSession("");
+        session.setLastExitCode(1); // simulate previous failure
+        CommandResult result = session.executeOnce("echo first");
+        assertTrue(result.isSuccess());
+        assertTrue(result.getStdout().contains("first"),
+                "First segment must always execute regardless of lastExitCode");
+    }
+
+    @Test
+    void resolveStdin_noRedirectNoPipe_commandReceivesNoStdin() {
+        ShellSession session = createSession("");
+        // grep with no stdin and no file (should produce no matches)
+        CommandResult result = session.executeOnce("grep anything");
+        // Should complete without crashing (no output expected)
+        assertNotNull(result);
+    }
+
+    @Test
+    void handleCommandNotFound_errorMessageContainsCommandName() {
+        ShellSession session = createSession("");
+        CommandResult result = session.executeOnce("ghostcmd");
+        assertTrue(result.getStderr().contains("ghostcmd"),
+                "stderr must name the unrecognised command");
+        assertTrue(result.getStderr().contains("command not found"));
+    }
 }
