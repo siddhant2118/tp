@@ -991,7 +991,7 @@ For PRAC questions:
 4. Type `exit` to submit.
 5. LinuxLingo checks whether the VFS matches the expected state and gives feedback.
 
-![PRAC question example](docs/imgs/PRACQuestionExample.png)
+![PRAC question example](imgs/PRACQuestionExample.png)
 
 ---
 
