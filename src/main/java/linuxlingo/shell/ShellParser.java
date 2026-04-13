@@ -3,6 +3,7 @@ package linuxlingo.shell;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
+import linuxlingo.shell.utility.Preconditions;
 
 /**
  * Transforms a raw input string into a structured execution plan.

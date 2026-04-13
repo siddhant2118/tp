@@ -1,4 +1,4 @@
-package linuxlingo.shell;
+package linuxlingo.shell.utility;
 
 /**
  * Exit codes used across the shell.

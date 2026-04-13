@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 
 import linuxlingo.cli.Ui;
 import linuxlingo.shell.command.Command;
+import linuxlingo.shell.utility.ExitCodes;
 import linuxlingo.shell.vfs.Directory;
 import linuxlingo.shell.vfs.FileNode;
 import linuxlingo.shell.vfs.VirtualFileSystem;

@@ -3,6 +3,7 @@ package linuxlingo.shell;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import linuxlingo.shell.utility.Preconditions;
 import org.junit.jupiter.api.Test;
 
 /**

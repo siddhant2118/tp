@@ -608,63 +608,69 @@ Examples:
 
 #### Managing command aliases: `alias`
 
-Lists, creates, or views command aliases. Aliases let you define shortcuts for commonly used commands.
+Creates a shortcut for a longer command, lists all defined shortcuts, or looks up a specific one.
 
-Format: `alias [NAME='VALUE']`
+Format: `alias [NAME=VALUE]`
 
-- `alias` (no arguments) -- list all aliases.
-- `alias NAME='VALUE'` -- create an alias.
-- `alias NAME` -- show the value of a specific alias.
+* `NAME` is the shortcut you want to type.
+* `VALUE` is the command it expands to. Wrap `VALUE` in quotes when it contains spaces.
 
-Example:
+Examples:
+* `alias` -- lists all currently defined aliases.
+* `alias ll='ls -l'` -- typing `ll` will now run `ls -l`.
+* `alias ll` -- shows what `ll` currently expands to.
 
-```text
-user@linuxlingo:/$ alias ll='ls -la'
-user@linuxlingo:/$ ll
-```
+> **Tip:** Aliases can chain. If `mypwd2` is aliased to `mypwd` and `mypwd` is itself aliased to something else, LinuxLingo follows the chain automatically.
+>
+> ![Chaining_Example.png](docs/imgs/AliasCommandChainingExample.png)
 
-> [Note] **Note:** Quotes are required when the alias value contains spaces.
-> `alias ll='ls -la'` works correctly; `alias ll=ls -la` will only alias `ll` to `ls`,
-> silently ignoring `-la`.
-> [Tip] **Tip:** Aliases persist only for the current shell session. They are not saved across restarts. *(Coming soon: persistent aliases across sessions.)*
-> [Tip] **Tip:** Combined single-character flags like `-la` are automatically expanded to `-l -a` before the command runs, so both forms are accepted.
-> [Tip] **Tip:** Aliases can chain, if `ll` is aliased to `ls -la` and `ls` is aliased to another command, LinuxLingo will follow the chain automatically. Circular aliases are detected and stopped safely.
+> **Note:** Aliases last for the current session are saved when you leave the Shell Simulator.
 
-#### Removing aliases: `unalias`
+---
 
-Removes one or more command aliases.
+### Removing aliases : `unalias`
 
-Format: `unalias [-a] NAME [NAME...]`
+Removes one or more previously defined aliases.
 
-- `-a` -- remove all aliases.
+Format: `unalias NAME [NAME]...` or `unalias -a`
 
-Example:
+* Provide one or more names to remove them individually.
+* Use `-a` to remove all defined aliases at once.
 
-- `unalias ll` -- remove the `ll` alias.
+Examples:
+* `unalias ll` -- removes the `ll` alias.
+* `unalias ll la` -- removes both `ll` and `la`.
+* `unalias -a` -- clears all aliases.
 
-#### Viewing command history: `history`
 
-Displays or manages the list of previously entered commands.
+![Unalias_Example.png](docs/imgs/UnaliasCommandExample.png)
+
+---
+
+### Viewing command history : `history`
+
+Shows a numbered list of previously entered commands.
 
 Format: `history [-c] [N]`
 
-- `history` -- show all command history with line numbers.
-- `history N` -- show the last N commands.
-- `history -c` -- clear all command history.
+* `history` -- shows all commands entered this session, numbered from 1.
+* `history N` -- shows only the last `N` commands. (including the current command)
+* `history -c` -- clears the history.
 
 Example:
 
-```text
+```
 user@linuxlingo:/$ history
     1  ls
     2  cd /home/user
     3  mkdir projects
 ```
 
----
-> [Note] **Note:** Every command you enter is recorded in history, including commands that fail or produce errors. The `history` command itself is not recorded (mimics bash behaviour). History resets when you leave the Shell Simulator.
+> **Note:** Every command you enter is recorded, including ones that produce errors. The `history` command itself is also recorded. History resets when you leave the Shell Simulator.
 
-`history 0` shows no output (not an error). *(Coming soon: improved validation with an informative message for invalid counts.)*
+![History_Example.png](docs/imgs/HistoryCommandExample.png)
+---
+
 
 ### Environment Management Commands
 
