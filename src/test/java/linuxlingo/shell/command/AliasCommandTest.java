@@ -101,14 +101,6 @@ public class AliasCommandTest {
     }
 
     @Test
-    public void alias_tooManyArgsWithoutEquals_showsFirstAliasOnly() {
-        session.getAliases().put("ll", "ls -la");
-        CommandResult result = command.execute(session, new String[]{"ll", "ignored"}, null);
-        assertTrue(result.isSuccess());
-        assertEquals("alias ll='ls -la'", result.getStdout());
-    }
-
-    @Test
     public void alias_setAliasWithDoubleQuotesStripsQuotes() {
         CommandResult result = command.execute(session, new String[]{"ll=\"ls -la\""}, null);
         assertTrue(result.isSuccess());

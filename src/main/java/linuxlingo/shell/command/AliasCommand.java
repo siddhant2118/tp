@@ -31,8 +31,7 @@ public class AliasCommand implements Command {
 
         if (args.length >= 2 && (args[1].equals("=") || args[1].startsWith("="))) {
             return CommandResult.error(
-                    "alias: invalid syntax: spaces around '=' are not allowed "
-                            + "(use: alias " + args[0] + "=" + (args.length > 2 ? args[2] : args[1].substring(1)) + ")");
+                    "alias: invalid syntax: spaces around '=' are not allowed");
         }
 
         String primaryArg = args[0];
@@ -45,7 +44,7 @@ public class AliasCommand implements Command {
             return showAlias(session, primaryArg);
         }
 
-        return setAlias(session, primaryArg);
+        return setAlias(session, primaryArg, args);
     }
 
     /**
@@ -76,9 +75,10 @@ public class AliasCommand implements Command {
      *
      * @param session    the active shell session
      * @param definition the raw alias definition (e.g. {@code ll=ls -la} or {@code ll='ls -la'})
+     * @param args all arguments passed to the command
      * @return a {@link CommandResult} indicating success or a descriptive error
      */
-    private CommandResult setAlias(ShellSession session, String definition) {
+    private CommandResult setAlias(ShellSession session, String definition, String[] args) {
         int eqIndex = definition.indexOf('=');
 
         // eqIndex == 0 means the name portion is empty (e.g. "=value")
@@ -93,6 +93,19 @@ public class AliasCommand implements Command {
 
         if (name.isBlank()) {
             return CommandResult.error("alias: name must not be blank");
+        }
+
+        // Check if there are extra arguments after the alias definition
+        if (args.length > 1) {
+            StringBuilder extraArgs = new StringBuilder();
+            for (int i = 1; i < args.length; i++) {
+                if (i > 1) extraArgs.append(' ');
+                extraArgs.append(args[i]);
+            }
+            return CommandResult.error(
+                    "alias: too many arguments: '" + extraArgs + "' will be ignored.\n" +
+                            "Use quotes if you want to include them in the alias: alias " + name + "='" + value + " " + extraArgs + "'"
+            );
         }
 
         session.getAliases().put(name, value);
