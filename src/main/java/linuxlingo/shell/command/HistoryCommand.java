@@ -64,7 +64,7 @@ public class HistoryCommand implements Command {
             return CommandResult.error("history: " + nStr + ": numeric argument required");
         }
 
-        if (rawCount > Integer.MAX_VALUE || rawCount < Integer.MIN_VALUE) {
+        if (rawCount > Integer.MAX_VALUE) {
             return CommandResult.error("history: " + nStr + ": numeric argument out of range");
         }
 

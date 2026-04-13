@@ -1,5 +1,6 @@
 package linuxlingo.shell.command;
 
+
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -28,14 +29,22 @@ public class AliasCommand implements Command {
             return listAliases(session);
         }
 
+        if (args.length >= 2 && (args[1].equals("=") || args[1].startsWith("="))) {
+            return CommandResult.error(
+                    "alias: invalid syntax: spaces around '=' are not allowed");
+        }
+
         String primaryArg = args[0];
 
         // if name is provided without '=' then show that specific alias
         if (!primaryArg.contains("=")) {
+            if (args.length > 1) {
+                return CommandResult.error("alias: too many arguments");
+            }
             return showAlias(session, primaryArg);
         }
 
-        return setAlias(session, primaryArg);
+        return setAlias(session, primaryArg, args);
     }
 
     /**
@@ -66,9 +75,10 @@ public class AliasCommand implements Command {
      *
      * @param session    the active shell session
      * @param definition the raw alias definition (e.g. {@code ll=ls -la} or {@code ll='ls -la'})
+     * @param args all arguments passed to the command
      * @return a {@link CommandResult} indicating success or a descriptive error
      */
-    private CommandResult setAlias(ShellSession session, String definition) {
+    private CommandResult setAlias(ShellSession session, String definition, String[] args) {
         int eqIndex = definition.indexOf('=');
 
         // eqIndex == 0 means the name portion is empty (e.g. "=value")
@@ -83,6 +93,22 @@ public class AliasCommand implements Command {
 
         if (name.isBlank()) {
             return CommandResult.error("alias: name must not be blank");
+        }
+
+        // Check if there are extra arguments after the alias definition
+        if (args.length > 1) {
+            StringBuilder extraArgs = new StringBuilder();
+            for (int i = 1; i < args.length; i++) {
+                if (i > 1) {
+                    extraArgs.append(' ');
+                }
+                extraArgs.append(args[i]);
+            }
+            return CommandResult.error(
+                    "alias: too many arguments: " +
+                            "Use quotes if you want to include them in the alias: alias "
+                            + name + "='" + value + " " + extraArgs + "'"
+            );
         }
 
         session.getAliases().put(name, value);
@@ -117,6 +143,7 @@ public class AliasCommand implements Command {
      */
     private CommandResult showAlias(ShellSession session, String name) {
         String value = session.getAliases().get(name);
+
         if (value == null) {
             return CommandResult.error("alias: " + name + ": not found");
         }

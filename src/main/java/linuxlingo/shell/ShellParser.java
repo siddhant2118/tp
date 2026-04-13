@@ -512,12 +512,24 @@ public class ShellParser {
             segments.add(buildSegment(currentWords, currentRedirect, currentInputRedirect));
         }
 
+        // A redirect target was consumed but there is no command to attach it to (#209)
+        // e.g. "< file" or "> file" with nothing preceding it.
+        if (currentWords.isEmpty() && (currentRedirect != null || currentInputRedirect != null)) {
+            throw new IllegalArgumentException("syntax error: redirection without a command");
+        }
+
         // Detect dangling redirect/pipe with no target (#139)
         if (expectRedirectTarget || expectInputRedirectTarget) {
             throw new IllegalArgumentException("syntax error: missing filename for redirect");
         }
+
         // If there's a trailing operator with no following segment, it's dangling
-        if (operators.size() >= segments.size() && !segments.isEmpty()) {
+        if (segments.isEmpty() && !operators.isEmpty()) {
+            throw new IllegalArgumentException("syntax error: empty command");
+        }
+
+        // If there's a trailing operator with no following segment, it's dangling
+        if (!operators.isEmpty() && operators.size() >= segments.size()) {
             throw new IllegalArgumentException("syntax error: unexpected end of input after operator");
         }
 

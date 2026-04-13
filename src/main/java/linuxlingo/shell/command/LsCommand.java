@@ -45,6 +45,9 @@ public class LsCommand implements Command {
                     }
                 }
             } else {
+                if (arg.isEmpty()) {
+                    return CommandResult.error("ls: cannot access '': No such file or directory");
+                }
                 targetPaths.add(arg);
             }
         }

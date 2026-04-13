@@ -21,6 +21,11 @@ public class CdCommand implements Command {
         String currentDir = session.getWorkingDir();
         String target = args.length == 0 ? "~" : args[0];
 
+        // Explicitly quoted empty string is not a valid path
+        if (target.isEmpty()) {
+            return CommandResult.error("cd: path cannot be empty");
+        }
+
         if ("-".equals(target)) {
             String previousDir = session.getPreviousDir();
             if (previousDir == null) {

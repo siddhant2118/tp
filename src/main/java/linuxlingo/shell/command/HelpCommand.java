@@ -17,10 +17,7 @@ public class HelpCommand implements Command {
         if (args.length == 0) {
             StringBuilder out = new StringBuilder("Available commands:");
             for (Map.Entry<String, String> entry : session.getRegistry().getHelpText().entrySet()) {
-                out.append("\n  ")
-                        .append(entry.getKey())
-                        .append(" - ")
-                        .append(entry.getValue());
+                out.append(String.format("\n  %-20s %s", entry.getKey(), entry.getValue()));
             }
             return CommandResult.success(out.toString());
         }
