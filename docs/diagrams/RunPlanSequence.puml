@@ -6,7 +6,7 @@ participant ":Command" as CMD
 participant ":VirtualFileSystem" as VFS
 participant ":Ui" as UI
 
-loop for each Segment in ParsedPlan
+loop for each Segment i in ParsedPlan
 
   SS -> SS : check preceding operator
   activate SS
@@ -18,9 +18,21 @@ loop for each Segment in ParsedPlan
   end note
   deactivate SS
 
-  SS -> SS : resolve alias, expand flags,\nexpand globs, expand variables
-  activate SS
-  deactivate SS
+  SS -> SS : resolveStdin(segment, pipedStdin)
+    activate SS
+    note right
+      inputRedirect present → VFS.readFile()
+      else use pipedStdin
+    end note
+    deactivate SS
+
+  SS -> SS : prepareArgs(segment)
+    activate SS
+    note right
+      resolveAlias → expandCombinedFlags
+      → expandGlobs → expandVariables
+    end note
+    deactivate SS
 
   SS -> CR : get(resolvedName)
 
@@ -37,6 +49,9 @@ loop for each Segment in ParsedPlan
     activate SS
     deactivate SS
     SS -> UI : println(error + suggestion)
+    SS -> SS : setLastExitCode(127)
+    activate SS
+    deactivate SS
   end
 
 end

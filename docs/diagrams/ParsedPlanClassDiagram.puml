@@ -1,0 +1,30 @@
+@startuml ParsedPlanClass
+enum TokenType {
+  WORD
+  PIPE
+  REDIRECT
+  APPEND
+  INPUT_REDIRECT
+  AND
+  OR
+  SEMICOLON
+}
+class ParsedPlan {
+  +List<Segment> segments
+  +List<TokenType> operators
+}
+class Segment {
+  +String commandName
+  +String[] args
+  +RedirectInfo redirect
+  +String inputRedirect
+}
+class RedirectInfo {
+  +String operator
+  +String target
+  +isAppend() : boolean
+}
+ParsedPlan "1" *-- "0..*" Segment
+Segment "1" *-- "0..1" RedirectInfo
+ParsedPlan --> TokenType : uses
+@enduml

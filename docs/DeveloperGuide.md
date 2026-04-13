@@ -239,6 +239,8 @@ distinguished from `|` and `>` by peeking at the next character before emitting 
 A lone `&` character (not followed by another `&`) is treated as a literal word character
 rather than an operator, which matches standard shell behaviour.
 
+> **Note:** Single-quoted tokens (e.g. `'*.txt'`) are marked with a `\0` prefix by the tokenizer (`SINGLE_QUOTE_MARKER`). This flag is checked by `expandGlobs()` and `expandVariables()` to suppress expansion, matching standard shell behaviour. The marker is stripped before the argument reaches the command.
+
 #### Stage 2: Plan Building
 
 Once the flat token list is produced, `buildPlan()` walks through it and groups tokens into `Segment` objects. Each `Segment` holds a command name, its arguments, and optional redirect information. Operator tokens (`PIPE`, `AND`, `SEMICOLON`, `OR`) act as delimiters between segments and are recorded separately in the `operators` list.
@@ -251,25 +253,52 @@ The result is a `ParsedPlan` with the following invariant, enforced by an assert
 
 This means a plan with three segments always has exactly two operators connecting them, making the execution engine's iteration straightforward.
 
+Class Diagram
+
+![ParsedPlan Class Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/ParsedPlanClassDiagram.puml)
+
 #### Execution engine (`ShellSession.runPlan()`)
 
 All parsing ultimately feeds into `runPlan()`, the core method that iterates the `ParsedPlan` and chains commands together. It is worth understanding its structure because most enhancements to the shell (new operators, alias resolution, input redirect) are implemented here.
 
 The engine tracks two pieces of state across iterations: `pipedStdin` (the stdout of the previous command, forwarded when the operator was `PIPE`) and `lastExitCode` (used to evaluate `&&` and `||` conditions). The loop processes one `Segment` per iteration:
 
+**runPlan() Sequence Diagram:**
+
 ![Run Plan Sequence Diagram](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/RunPlanSequence.puml)
 
-#### Key Behaviours
-
-**Redirect consumes stdout:** After a redirect, the result is replaced with an empty success.  
-  Example:  
-  `echo hello > file | grep h`  
-  → `grep` receives empty stdin (matching standard shell behaviour).
-
-**Exit propagation:** The `shouldExit()` flag on `CommandResult` causes `runPlan()` to set  
+#### Key Behaviour:
+Exit propagation: The `shouldExit()` flag on `CommandResult` causes `runPlan()` to set  
   `running = false` and break the loop immediately.
 
-The following sequence diagram shows how `echo hello | grep h > output.txt` is executed:
+---
+#### Execution walkthrough: `echo hello | grep h > output.txt`
+
+**Stage 1 (Tokenization):** produces the flat token list:
+
+| # | Value | Type |
+|---|-------|------|
+| 1 | `echo` | WORD |
+| 2 | `hello` | WORD |
+| 3 | `\|` | PIPE |
+| 4 | `grep` | WORD |
+| 5 | `h` | WORD |
+| 6 | `>` | REDIRECT |
+| 7 | `output.txt` | WORD |
+
+**Stage 2 (Plan building):** splits on the PIPE and consumes `output.txt`
+as a redirect target, yielding a `ParsedPlan` with:
+- Segment 1: `echo [hello]`, no redirect
+- Segment 2: `grep [h]`, redirect `> output.txt`
+- Operator: `[PIPE]`
+
+**Stage 3 (Execution):** (`runPlan()`): the sequence diagram below shows
+how `ShellSession` orchestrates the two segments. Key points to note:
+- `echo`'s stdout (`"hello"`) is forwarded as `pipedStdin` to `grep`
+- After `grep` executes, its stdout is written to `output.txt` via the
+  VFS rather than printed to the terminal (the result is replaced with
+  an empty success)
+
 
 ![Echo Grep Pipe Execution Sequence](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/AY2526S2-CS2113-T10-2/tp/master/docs/diagrams/EchoGrepPipeSequence.puml)
 
@@ -279,7 +308,7 @@ the mistyped input and every registered command name, returning a "Did you mean 
 hint if the closest match is within distance 2. Glob patterns in arguments (containing
 `*` or `?`) are expanded against the VFS via `expandGlobs()` before the command receives
 them, if no VFS paths match the pattern, the literal argument is passed through unchanged. -->
-
+---
 **Operator semantics:**
 
 | Operator | Symbol | Behavior |
@@ -328,6 +357,7 @@ The following activity diagram shows the input resolution logic for commands tha
 
 Variables inside single-quoted strings are not expanded (single-quoted tokens are marked with a `\0` prefix during tokenization). The `expandVariablesInString()` method scans each argument character-by-character, recognises `$` followed by an alphanumeric name or `?`, and substitutes the resolved value.
 
+
 ---
 
 ### Glob Expansion
@@ -339,6 +369,7 @@ Glob patterns (`*` and `?`) in command arguments are expanded against the VFS be
 3. **Fallback:** If no VFS paths match a glob pattern, the literal pattern is passed through unchanged (standard shell behaviour).
 
 Matching uses `VirtualFileSystem.matchesWildcard()`, which converts `*` → `.*` and `?` → `.` to build a regex.
+
 
 ---
 
