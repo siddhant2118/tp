@@ -3,13 +3,9 @@
 > **CS2113 – LinuxLingo**  
 > GitHub: [`@puma-31`](https://github.com/puma-31)
 
----
-
 ## Overview
 
 I was the **primary developer and maintainer** of the **Exam module** in **LinuxLingo**, an educational CLI app that teaches Linux commands through practice and exam-style questions. LinuxLingo provides an interactive shell simulator combined with a quiz system, allowing students to practice Linux commands safely in a virtual file system and test their knowledge through multiple question types. My work focused on designing and implementing the **end-to-end exam experience**, from the question data model and parsing pipeline, through exam sessions and interactive workflows, to grading, feedback, and results. The implementation emphasizes robustness, comprehensive testing, maintainability, and a seamless CLI user experience.
-
----
 
 ## Summary of Contributions
 
@@ -54,15 +50,11 @@ I was the **primary developer and maintainer** of the **Exam module** in **Linux
 - **Key Implementation:** Tests covering parsing, grading, session logic; edge cases (invalid inputs, malformed questions, skipped/aborted exams); separation of concerns (parsing, business logic, UI layer).
 - **Technical Details:** Refactored to eliminate duplication; achieved high coverage for critical exam paths (normal flow, error cases, edge cases).
 
----
-
 ### Contributions to the User Guide (UG)
 
 I authored the **Exam System** section documenting: exam modes & commands (four invocation formats with examples), interactive flow, in-exam control commands (quit/abort/exit with context-dependent behavior table for MCQ/FITB vs. PRAC), question types with answer instructions, PRAC workflow examples, topic management, and edge case handling for invalid inputs and numeric validation.
 
 Link: [Exam System – User Guide](https://ay2526s2-cs2113-t10-2.github.io/tp/UserGuide.html#exam-system)
-
----
 
 ### Contributions to the Developer Guide (DG)
 
@@ -78,16 +70,12 @@ Link: [Exam Session Flow – Developer Guide](https://ay2526s2-cs2113-t10-2.gith
 
 - **Code Reviews:** Reviewed pull requests [#152](https://github.com/AY2526S2-CS2113-T10-2/tp/pull/152), [#212](https://github.com/AY2526S2-CS2113-T10-2/tp/pull/212) and [#94](https://github.com/AY2526S2-CS2113-T10-2/tp/pull/94)
 
----
-
 ### Contributions to Team-based Tasks
 
 - **Infrastructure:** Implemented question parsing framework, exam command handling, VFS factory pattern supporting all exam features
 - **Issue Management:** Tracked and prioritized exam module work through GitHub Issues
 - **Testing & Bug Fixes:** Performed thorough bug testing, identified edge cases, and suggested fixes to teammates' code
 - **General Enhancements:** Project infrastructure enhancements supporting the exam module
-
----
 
 ### Contributions beyond the Project Team
 
