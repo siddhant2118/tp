@@ -30,23 +30,12 @@ public class AliasCommand implements Command {
             return listAliases(session);
         }
 
-        // Detect "alias name = value" — spaces around '=' cause the parser to split
-        // into separate args. Give a clear error rather than silently mishandling.
-        if (args.length >= 2 && (args[1].equals("=") || args[1].startsWith("="))) {
-            return CommandResult.error(
-                    "alias: invalid syntax: spaces around '=' are not allowed "
-                            + "(use: alias " + args[0] + "=" + (args.length > 2 ? args[2] : args[1].substring(1)) + ")");
-        }
-
         String primaryArg = args[0];
 
         // if name is provided without '=' then show that specific alias
         if (!primaryArg.contains("=")) {
-            // Extra args with no '=' is ambiguous
             if (args.length > 1) {
-                return CommandResult.error(
-                        "alias: too many arguments (did you mean: alias " + primaryArg + "='"
-                                + String.join(" ", copyOfRange(args, 1, args.length)) + "'?)");
+                return CommandResult.error("alias: invalid syntax");
             }
             return showAlias(session, primaryArg);
         }
