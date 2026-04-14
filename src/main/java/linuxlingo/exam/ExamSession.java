@@ -130,21 +130,28 @@ public class ExamSession {
      * @return the number of questions to attempt
      */
     private int promptForQuestionCount(int total) {
-        String countInput = ui.readLine("How many questions? (1-" + total + ", default: all): ");
+        while (true) {
+            String countInput = ui.readLine("How many questions? (1-" + total + ", default: all): ");
 
-        int count;
-        if (countInput != null && !countInput.trim().isEmpty()) {
-            try {
-                count = Integer.parseInt(countInput.trim());
-            } catch (NumberFormatException e) {
-                LOGGER.log(Level.INFO, "Invalid interactive count ''{0}'', defaulting to total", countInput);
-                count = total;
+            if (countInput == null || countInput.trim().isEmpty()) {
+                return total;
             }
-        } else {
-            count = total;
-        }
 
-        return Math.max(1, Math.min(count, total));
+            String trimmed = countInput.trim();
+            try {
+                int count = Integer.parseInt(trimmed);
+                return Math.max(1, Math.min(count, total));
+            } catch (NumberFormatException e) {
+                // Check if it's a decimal
+                try {
+                    Double.parseDouble(trimmed);
+                } catch (NumberFormatException e2) {
+                    // Not a number at all
+                }
+                LOGGER.log(Level.INFO, "Invalid interactive count ''{0}'', reprompting", countInput);
+                ui.println("Invalid input. Please enter a whole number between 1 and " + total + ".");
+            }
+        }
     }
 
     /**
@@ -240,6 +247,7 @@ public class ExamSession {
         if (tempVfs == null) {
             throw new IllegalStateException("vfsFactory returned null VirtualFileSystem");
         }
+        q.applySetup(tempVfs);
         ShellSession tempSession = new ShellSession(tempVfs, ui);
         tempSession.start();
 
