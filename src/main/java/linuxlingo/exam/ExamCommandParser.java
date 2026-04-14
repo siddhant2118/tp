@@ -100,7 +100,12 @@ public final class ExamCommandParser {
                 try {
                     count = Integer.parseInt(value.trim());
                 } catch (NumberFormatException e) {
-                    return ParsedExamArgs.error("Invalid count: " + value);
+                    // Handle decimals like "1.5" by truncating
+                    try {
+                        count = (int) Double.parseDouble(value.trim());
+                    } catch (NumberFormatException e2) {
+                        return ParsedExamArgs.error("Invalid count: " + value);
+                    }
                 }
                 i++; // consume value
             }
@@ -148,7 +153,11 @@ public final class ExamCommandParser {
             return null;
         }
         value = value.trim();
-        if (value.isEmpty() || value.startsWith("-")) {
+        if (value.isEmpty()) {
+            return null;
+        }
+        // Allow negative numbers (e.g. "-1") but reject flags (e.g. "-t", "-random")
+        if (value.startsWith("-") && !value.matches("-\\d+")) {
             return null;
         }
         return value;
