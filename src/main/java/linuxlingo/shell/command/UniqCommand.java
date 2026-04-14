@@ -1,8 +1,5 @@
 package linuxlingo.shell.command;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import linuxlingo.shell.CommandResult;
 import linuxlingo.shell.ShellSession;
 import linuxlingo.shell.vfs.VfsException;
@@ -54,48 +51,54 @@ public class UniqCommand implements Command {
             return CommandResult.success("");
         }
 
+        StringBuilder sb = new StringBuilder();
         String[] linesArray = content.split("\n", -1);
-        List<String> results = new ArrayList<>();
+        boolean endsWithNewline = content.endsWith("\n");
+        int len = endsWithNewline ? linesArray.length - 1 : linesArray.length;
 
-        if (linesArray.length > 0) {
+        if (len > 0) {
             String currentLine = linesArray[0];
             int count = 1;
 
-            for (int i = 1; i < linesArray.length; i++) {
+            for (int i = 1; i < len; i++) {
                 if (linesArray[i].equals(currentLine)) {
                     count++;
                 } else {
-                    addUniqResult(results, currentLine, count, countOccurrences, duplicatesOnly);
+                    addUniqResult(sb, currentLine, count, countOccurrences, duplicatesOnly);
                     currentLine = linesArray[i];
                     count = 1;
                 }
             }
 
-            addUniqResult(results, currentLine, count, countOccurrences, duplicatesOnly);
+            addUniqResult(sb, currentLine, count, countOccurrences, duplicatesOnly);
         }
 
-        return CommandResult.success(String.join("\n", results));
+        // remove a single trailing \n if present
+        if (!sb.isEmpty() && sb.charAt(sb.length() - 1) == '\n') {
+            sb.setLength(sb.length() - 1);
+        }
+        return CommandResult.success(sb.toString());
     }
 
     /**
      * Adds a formatted uniq result line, respecting {@code -c} and {@code -d}.
      *
-     * @param results          the output list to append to
+     * @param sb               the StringBuilder to append to
      * @param line             the current unique line
      * @param count            how many adjacent occurrences
      * @param countOccurrences whether -c flag is set
      * @param duplicatesOnly   whether -d flag is set
      */
-    private void addUniqResult(List<String> results, String line, int count,
+    private void addUniqResult(StringBuilder sb, String line, int count,
                                boolean countOccurrences, boolean duplicatesOnly) {
         if (duplicatesOnly && count < 2) {
             return;
         }
 
         if (countOccurrences) {
-            results.add(String.format("%7d %s", count, line));
+            sb.append(String.format("%7d %s\n", count, line));
         } else {
-            results.add(line);
+            sb.append(line).append("\n");
         }
     }
 

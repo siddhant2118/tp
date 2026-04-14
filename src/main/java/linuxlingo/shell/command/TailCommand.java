@@ -71,7 +71,7 @@ public class TailCommand implements Command {
             return CommandResult.error("tail: missing file operand");
         }
 
-        List<String> output = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
         boolean hasError = false;
 
         boolean multiFile = files.size() > 1;
@@ -82,62 +82,76 @@ public class TailCommand implements Command {
                     String content = session.getVfs().readFile(files.get(i), session.getWorkingDir());
                     if (multiFile) {
                         if (i > 0) {
-                            output.add(""); // newline between files
+                            sb.append("\n"); // newline between files
                         }
-                        output.add("==> " + files.get(i) + " <==");
+                        sb.append("==> ").append(files.get(i)).append(" <==").append("\n");
                     }
                     if (fromStart) {
-                        appendTailFromStart(output, content, n);
+                        appendTailFromStart(sb, content, n);
                     } else {
-                        appendTailLines(output, content, n);
+                        appendTailLines(sb, content, n);
                     }
                 } catch (VfsException e) {
-                    output.add("tail: " + files.get(i) + ": " + e.getMessage());
+                    sb.append("tail: ").append(files.get(i)).append(": ").append(e.getMessage());
                     hasError = true;
                 }
             }
         } else {
             if (fromStart) {
-                appendTailFromStart(output, stdin, n);
+                appendTailFromStart(sb, stdin, n);
             } else {
-                appendTailLines(output, stdin, n);
+                appendTailLines(sb, stdin, n);
             }
         }
 
-        String result = String.join("\n", output);
+        String result = sb.toString();
         return hasError ? CommandResult.error(result) : CommandResult.success(result);
     }
 
-    private void appendTailLines(List<String> output, String content, int n) {
+    private void appendTailLines(StringBuilder sb, String content, int n) {
         if (content.isEmpty()) {
             return;
         }
 
         String[] linesArray = content.split("\n", -1);
-        int start = Math.max(0, linesArray.length - n);
+        boolean endsWithNewline = content.endsWith("\n");
+        int len = endsWithNewline ? linesArray.length - 1 : linesArray.length;
+        int start = Math.max(0, len - n);
 
-        for (int i = start; i < linesArray.length; i++) {
-            output.add(linesArray[i]);
+        for (int i = start; i < len; i++) {
+            sb.append(linesArray[i]);
+
+            boolean isLastLine = i == len - 1;
+            if (!isLastLine || endsWithNewline) {
+                sb.append("\n");
+            }
         }
     }
 
     /**
      * Appends lines starting from line N (1-indexed), skipping the first N-1 lines.
      *
-     * @param output  the output list
+     * @param sb      the StringBuilder to append to
      * @param content the file content
      * @param n       the starting line number (1-indexed)
      */
-    private void appendTailFromStart(List<String> output, String content, int n) {
+    private void appendTailFromStart(StringBuilder sb, String content, int n) {
         if (content.isEmpty()) {
             return;
         }
 
         String[] linesArray = content.split("\n", -1);
+        boolean endsWithNewline = content.endsWith("\n");
+        int len = endsWithNewline ? linesArray.length - 1 : linesArray.length;
         int start = Math.max(0, n - 1);
 
-        for (int i = start; i < linesArray.length; i++) {
-            output.add(linesArray[i]);
+        for (int i = start; i < len; i++) {
+            sb.append(linesArray[i]);
+
+            boolean isLastLine = i == len - 1;
+            if (!isLastLine || endsWithNewline) {
+                sb.append("\n");
+            }
         }
     }
 
