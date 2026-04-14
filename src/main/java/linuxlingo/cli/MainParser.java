@@ -135,8 +135,25 @@ public class MainParser {
         if (envName != null) {
             try {
                 var loaded = linuxlingo.storage.VfsSerializer.loadFromFile(envName);
+                // Save original state to restore after exec -e
+                var originalVfs = shellSession.getVfs();
+                var originalWorkingDir = shellSession.getWorkingDir();
                 shellSession.replaceVfs(loaded.getVfs());
                 shellSession.setWorkingDir(loaded.getWorkingDir());
+
+                var result = shellSession.executeOnce(rest);
+                // Print stderr before stdout to match display ordering (#147)
+                if (!result.getStderr().isEmpty()) {
+                    ui.printError(result.getStderr());
+                }
+                if (!result.getStdout().isEmpty()) {
+                    ui.println(result.getStdout());
+                }
+
+                // Restore original VFS state so exec -e doesn't persist
+                shellSession.replaceVfs(originalVfs);
+                shellSession.setWorkingDir(originalWorkingDir);
+                return;
             } catch (linuxlingo.storage.StorageException e) {
                 ui.printError("exec: " + e.getMessage());
                 return;
