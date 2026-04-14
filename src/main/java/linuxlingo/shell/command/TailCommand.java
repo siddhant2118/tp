@@ -92,7 +92,11 @@ public class TailCommand implements Command {
                         appendTailLines(sb, content, n);
                     }
                 } catch (VfsException e) {
-                    sb.append("tail: ").append(files.get(i)).append(": ").append(e.getMessage());
+                    String msg = e.getMessage();
+                    // Strip trailing path from VfsException message to avoid duplication
+                    int colonIdx = msg.indexOf(':');
+                    String reason = (colonIdx >= 0) ? msg.substring(0, colonIdx).trim() : msg;
+                    sb.append("tail: ").append(files.get(i)).append(": ").append(reason);
                     hasError = true;
                 }
             }

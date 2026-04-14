@@ -70,7 +70,11 @@ public class HeadCommand implements Command {
                     }
                     appendHeadLines(output, content, n);
                 } catch (VfsException e) {
-                    output.add("head: " + files.get(i) + ": " + e.getMessage());
+                    String msg = e.getMessage();
+                    // Strip trailing path from VfsException message to avoid duplication
+                    int colonIdx = msg.indexOf(':');
+                    String reason = (colonIdx >= 0) ? msg.substring(0, colonIdx).trim() : msg;
+                    output.add("head: " + files.get(i) + ": " + reason);
                     hasError = true;
                 }
             }
