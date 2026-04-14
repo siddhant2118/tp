@@ -20,11 +20,11 @@ My contributions centred on the core shell infrastructure: the input parsing pip
 
 Implemented the full parsing pipeline that transforms raw user input into structured execution plans. This was a non-trivial component requiring careful design across three layers:
 
-- *Tokenizer* — a character-by-character state machine handling whitespace, single quotes, double quotes, and backslash escaping. Correctly recognises all shell operators (`|`, `||`, `>`, `>>`, `<`, `&&`, `;`).
-- *Segment builder* — splits the token stream into command segments, each carrying a command name, arguments, an optional output redirect, and an optional input redirect.
-- *Execution plan constructor* — composes segments into a structured `ParsedPlan` consumed by the execution engine, enforcing the invariant that `operators.size()` is always exactly `segments.size() - 1`.
+- *Tokenizer*: a character-by-character state machine handling whitespace, single quotes, double quotes, and backslash escaping. Correctly recognises all shell operators (`|`, `||`, `>`, `>>`, `<`, `&&`, `;`).
+- *Segment builder*: splits the token stream into command segments, each carrying a command name, arguments, an optional output redirect, and an optional input redirect.
+- *Execution plan constructor*: composes segments into a structured `ParsedPlan` consumed by the execution engine, enforcing the invariant that `operators.size()` is always exactly `segments.size() - 1`.
 
-The `ShellParser` is the architectural centrepiece of the shell subsystem — every command the user types passes through it before anything else runs. Getting quoting, escaping, and operator disambiguation right (e.g. lookahead for `|` vs `||` and `>` vs `>>`) required iterative refinement and is the kind of low-level infrastructure that is invisible when it works but breaks everything when it doesn't.
+The `ShellParser` is the architectural centrepiece of the shell subsystem, every command the user types passes through it before anything else runs.
 
 **Alias Management (`alias`, `unalias`)**
 
@@ -48,8 +48,8 @@ The `ShellParser` is the architectural centrepiece of the shell subsystem — ev
 
 **Shell Utility Classes**
 
-- `Preconditions` — a reusable validation helper (`requireNonNull`, `requireNonBlank`) used across `ShellParser`, `Token`, `Segment`, and `ParsedPlan` to eliminate repeated null checks and produce consistent error messages.
-- `ExitCodes` — a constants class centralising exit codes (`1`, `2`, `127`) used by the session engine and commands, preventing magic numbers from being scattered across the codebase.
+- `Preconditions`: reusable validation helper (`requireNonNull`, `requireNonBlank`) used across `ShellParser`, `Token`, `Segment`, and `ParsedPlan` to eliminate repeated null checks and produce consistent error messages.
+- `ExitCodes`: constants class centralising exit codes (`1`, `2`, `127`) used by the session engine and commands, preventing magic numbers from being scattered across the codebase.
 
 ---
 
