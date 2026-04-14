@@ -11,4 +11,4 @@ FITB | EASY   | To print the current directory: ___ | pwd | | pwd prints the cur
 FITB | EASY   | To go to the home directory: cd ___ | ~|/home/user | | ~ is a shortcut for the home directory.
 FITB | MEDIUM | To find all .txt files under /home: find /home -name "___" | *.txt | | -name accepts glob patterns where * matches any characters.
 FITB | MEDIUM | To go back to the previous directory: cd ___ | - | | 'cd -' switches to the previous working directory.
-PRAC | EASY   | Navigate to /etc and verify that hostname file exists by using ls. | /etc:DIR | | Use 'cd /etc' then 'ls' to see the hostname file.
+PRAC | EASY   | Navigate to /etc and create a file called visited.txt to confirm you were there. | /etc/visited.txt:FILE | | Use 'cd /etc' then 'touch visited.txt' to create the file.
