@@ -23,7 +23,7 @@ My contributions centred on the core shell infrastructure: the input parsing pip
 
 **Testing and Code Quality**
 
-- Wrote tests for `ShellSession`, `ShellParser`, `AliasCommand`, `UnaliasCommand`, and `HistoryCommand`, covering edge cases including null/empty input, pipe and AND operators, partial-success unalias, and self-recording of `history`.
+- Wrote tests for `ShellSession`, `ShellParser`, `AliasCommand`, `UnaliasCommand`, and `HistoryCommand`, covering edge cases.
 - Refactored code across the shell package applying DRY and SLAP, including extracting `flushCurrentToken()`, `buildSegment()`, `shouldSkipSegment()`, and `precedingOperatorIsNotPipe()`.
 - Wrote Javadoc for classes and methods in `linuxlingo.shell`, including methods written by teammates within the same package.
 
