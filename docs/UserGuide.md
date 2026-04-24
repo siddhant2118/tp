@@ -697,15 +697,21 @@ These commands let you save, load, and manage snapshots of the virtual file syst
 
 Saves the current VFS state and working directory as a named snapshot.
 
-Format: `save NAME`
+Format: `save [-f] NAME`
 
 - The name can only contain letters, digits, hyphens, and underscores.
 - Snapshots are stored in the `data/environments/` folder.
+- If an environment with the given name already exists, `save` fails to protect
+  against accidental overwrite. Pass `-f` (or `--force`) to overwrite.
 
 Example:
 
 ```text
 user@linuxlingo:/home/user$ save my-workspace
+Environment saved: my-workspace
+user@linuxlingo:/home/user$ save my-workspace
+save: environment 'my-workspace' already exists. Use 'save -f my-workspace' to overwrite.
+user@linuxlingo:/home/user$ save -f my-workspace
 Environment saved: my-workspace
 ```
 

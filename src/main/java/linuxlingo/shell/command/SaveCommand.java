@@ -7,19 +7,37 @@ import linuxlingo.storage.VfsSerializer;
 
 /**
  * Saves the current VFS state to a named environment file.
- * Syntax: save &lt;name&gt;
+ * Syntax: save [-f] &lt;name&gt;
+ *
+ * <p>By default, fails if an environment with the given name already exists,
+ * to prevent silent data loss. Use {@code -f} (force) to overwrite.</p>
  *
  * <p><b>Owner: B</b></p>
  */
 public class SaveCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
-        if (args.length != 1) {
+        boolean force = false;
+        String name = null;
+        for (String arg : args) {
+            if ("-f".equals(arg) || "--force".equals(arg)) {
+                force = true;
+            } else if (name == null) {
+                name = arg;
+            } else {
+                return CommandResult.error("save: usage: " + getUsage());
+            }
+        }
+        if (name == null) {
             return CommandResult.error("save: usage: " + getUsage());
         }
-        String name = args[0];
         if (!name.matches("[a-zA-Z0-9_-]+")) {
             return CommandResult.error("save: invalid environment name: " + name);
+        }
+        if (!force && VfsSerializer.environmentExists(name)) {
+            return CommandResult.error(
+                    "save: environment '" + name + "' already exists. "
+                            + "Use 'save -f " + name + "' to overwrite.");
         }
         try {
             VfsSerializer.saveToFile(session.getVfs(), session.getWorkingDir(), name);
@@ -31,7 +49,7 @@ public class SaveCommand implements Command {
 
     @Override
     public String getUsage() {
-        return "save <name>";
+        return "save [-f] <name>";
     }
 
     @Override
