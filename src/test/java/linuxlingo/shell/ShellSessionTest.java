@@ -333,6 +333,26 @@ class ShellSessionTest {
     }
 
     @Test
+    void expandCombinedFlags_standaloneDoubleDash_stopsExpansionAndIsStripped() {
+        ShellSession session = createSession("");
+        String[] result = session.expandCombinedFlags(
+                new String[]{"-l", "--", "-abc", "-xy"});
+        assertEquals(3, result.length);
+        assertEquals("-l", result[0]);
+        assertEquals("-abc", result[1]);
+        assertEquals("-xy", result[2]);
+    }
+
+    @Test
+    void expandCombinedFlags_doubleDashAtStart_passesDashFileLiterally() {
+        ShellSession session = createSession("");
+        String[] result = session.expandCombinedFlags(
+                new String[]{"--", "-abc"});
+        assertEquals(1, result.length);
+        assertEquals("-abc", result[0]);
+    }
+
+    @Test
     void expandCombinedFlags_numericFlag_unchanged() {
         ShellSession session = createSession("");
         String[] result = session.expandCombinedFlags(new String[]{"-5"});
