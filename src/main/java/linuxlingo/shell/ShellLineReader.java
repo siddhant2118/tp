@@ -99,6 +99,15 @@ public class ShellLineReader {
         // through literally to ShellParser (which handles its own escaping).
         reader.setOpt(LineReader.Option.DISABLE_EVENT_EXPANSION);
 
+        // Auto-list all completion candidates on an ambiguous completion
+        // instead of asking "do you wish to see all N possibilities?". The
+        // prompt was visually concatenating with the user's next keystroke
+        // and produced confusing output when a user hit TAB with empty
+        // input and then typed something (PE issue #30). The whole command
+        // set is ~35 items, so auto-listing is fine.
+        reader.setOpt(LineReader.Option.AUTO_LIST);
+        reader.setVariable(LineReader.LIST_MAX, 1000);
+
         return new ShellLineReader(reader, terminal, history);
     }
 
