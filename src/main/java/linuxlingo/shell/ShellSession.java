@@ -791,12 +791,27 @@ public class ShellSession {
      * Skips arguments that are a single flag, numeric flags like {@code -5},
      * or long-form flags.
      *
+     * <p>If a standalone {@code --} is encountered, flag expansion stops
+     * immediately and every subsequent argument is passed through literally,
+     * matching standard POSIX end-of-options behaviour. This lets users pass
+     * dash-prefixed filenames (e.g. {@code touch -- -abc}).</p>
+     *
      * @param args the original arguments
      * @return expanded arguments with combined flags split
      */
     public String[] expandCombinedFlags(String[] args) {
         List<String> expanded = new ArrayList<>();
+        boolean endOfOptions = false;
         for (String arg : args) {
+            if (endOfOptions) {
+                expanded.add(arg);
+                continue;
+            }
+            if ("--".equals(arg)) {
+                // Consume the marker; subsequent args pass through literally.
+                endOfOptions = true;
+                continue;
+            }
             // Expand if it starts with '-', has 3-6 chars (2-5 combined flags),
             // doesn't start with '--', all chars after '-' are letters, and
             // the flag text isn't a known multi-char option word (#145).
