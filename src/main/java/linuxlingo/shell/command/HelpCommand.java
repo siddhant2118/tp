@@ -15,7 +15,11 @@ public class HelpCommand implements Command {
     @Override
     public CommandResult execute(ShellSession session, String[] args, String stdin) {
         if (args.length == 0) {
-            StringBuilder out = new StringBuilder("Available commands:");
+            StringBuilder out = new StringBuilder(
+                    "Shell mode — Linux-style commands available in this session.\n"
+                    + "Type 'help <command>' for details on a specific command, "
+                    + "or 'exit' to leave shell mode.\n\n"
+                    + "Available commands:");
             for (Map.Entry<String, String> entry : session.getRegistry().getHelpText().entrySet()) {
                 out.append(String.format("\n  %-20s %s", entry.getKey(), entry.getValue()));
             }
