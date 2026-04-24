@@ -155,7 +155,7 @@ public class VfsSerializer {
                 continue;
             }
             String type = parts[0].trim();
-            String path = parts[1].trim();
+            String path = unescapeContent(parts[1].trim());
             String permString = parts[2].trim();
             Permission permission = new Permission(permString);
 
@@ -260,6 +260,17 @@ public class VfsSerializer {
         return Storage.delete(path);
     }
 
+    /**
+     * Check whether an environment with the given name already exists on disk.
+     *
+     * @param name environment name
+     * @return true if {@code data/environments/<name>.env} exists
+     */
+    public static boolean environmentExists(String name) {
+        Path path = Storage.getDataSubDir("environments").resolve(name + ".env");
+        return Storage.exists(path);
+    }
+
     // ─── Escaping helpers ────────────────────────────────────────
 
     /**
@@ -327,7 +338,7 @@ public class VfsSerializer {
     private static void appendNode(FileNode node, StringBuilder sb) {
         if (node.isDirectory()) {
             sb.append("DIR  | ")
-                    .append(node.getAbsolutePath())
+                    .append(escapeContent(node.getAbsolutePath()))
                     .append(" | ")
                     .append(node.getPermission())
                     .append("\n");
@@ -338,7 +349,7 @@ public class VfsSerializer {
         }
         RegularFile file = (RegularFile) node;
         sb.append("FILE | ")
-                .append(file.getAbsolutePath())
+                .append(escapeContent(file.getAbsolutePath()))
                 .append(" | ")
                 .append(file.getPermission())
                 .append(" | ")
