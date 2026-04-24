@@ -99,6 +99,30 @@ public class VfsSerializerTest {
     }
 
     @Test
+    public void serializeAndDeserialize_filenameWithPipe_roundTrips() {
+        VirtualFileSystem vfs = new VirtualFileSystem();
+        vfs.createFile("/tmp/a | b", "/");
+        vfs.writeFile("/tmp/a | b", "/", "hello", false);
+
+        String serialized = VfsSerializer.serialize(vfs, "/");
+        VfsSerializer.DeserializedVfs result = VfsSerializer.deserialize(serialized);
+
+        assertEquals("hello", result.getVfs().readFile("/tmp/a | b", "/"));
+    }
+
+    @Test
+    public void serializeAndDeserialize_directoryNameWithPipe_roundTrips() {
+        VirtualFileSystem vfs = new VirtualFileSystem();
+        vfs.createDirectory("/tmp/odd | dir", "/", false);
+        vfs.createFile("/tmp/odd | dir/inside.txt", "/");
+
+        String serialized = VfsSerializer.serialize(vfs, "/");
+        VfsSerializer.DeserializedVfs result = VfsSerializer.deserialize(serialized);
+
+        assertNotNull(result.getVfs().resolve("/tmp/odd | dir/inside.txt", "/"));
+    }
+
+    @Test
     public void listEnvironments_emptyDir_returnsEmptyList() {
         // Just checking that it doesn't crash
         var names = VfsSerializer.listEnvironments();
